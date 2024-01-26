@@ -1,0 +1,1 @@
+it faster if you compile tesseract yourself and disable openmp
