@@ -55,6 +55,8 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         Box::new(it)
     };
 
+    // I chunk the thing into vectors so rayon can use it correctly, but this ends up
+    // leading to a situation where we are waiting on one large image to finish processing.
     let chunks = it.chunks(options.chunksize);
 
     for citer in chunks.into_iter() {
