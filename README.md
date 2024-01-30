@@ -1,4 +1,4 @@
-# OCRLocate
+# ocrlocate
 A tool for indexing a directory of images with optical character recognition for searching
 
 ## Dependencies
@@ -9,3 +9,4 @@ Run `cargo install --git https://github.com/bepvte/ocrlocate`.
 
 ## Performance
 To increase the performance, enable the compilation of tesseract without openmp with `cargo install --git https://github.com/bepvte/ocrlocate --features bundled`.
+A surprising amount (5%) of CPU time is used on the zlib decoding for libpng. For comparison, around 15% of cpu time is spent on the LSTM kernel for tesseract. The best solution I have found is to use [zlib-ng](https://github.com/zlib-ng/zlib-ng) and run the program with it in LD_PRELOAD, which reduces the cpu time to 2%.. While you could link libpng to zlib-ng manually, I found this difficult and just chose to use `LD_PRELOAD`.

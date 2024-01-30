@@ -120,10 +120,12 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                             }
                             Ok((width, height)) => {
                                 if width > max_width || height > max_height {
-                                    eprintln!(
-                                        "skipping image: {:?} with dimensions {}x{}",
-                                        p.0, width, height
-                                    );
+                                    if options.debug {
+                                        eprintln!(
+                                            "skipping image: {:?} with dimensions {}x{}",
+                                            p.0, width, height
+                                        );
+                                    }
                                     return None;
                                 }
                             }
