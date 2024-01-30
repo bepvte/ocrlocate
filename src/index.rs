@@ -103,11 +103,11 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let abar = arcbar.clone();
         let chunk: Vec<_> = chunk
             .into_iter()
-            .filter_map(|p| {
+            .filter(|p| {
                 if !options.rescan && db.is_indexed(&p.0, &p.1) {
                     db.unmark_file(&p.0);
                     abar.lock().unwrap().update(1).unwrap();
-                    return None;
+                    return false;
                 }
                 if let Some((max_width, max_height)) = options.max_dimensions {
                     let img = ImageReader::open(&p.0)
@@ -116,12 +116,15 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                     match img {
                         Err(_) => {
                             eprintln!("Failed to read image to check dimensions: {:?}", p.0);
-                            return None;
+                            return false;
                         }
                         Ok(img) => match img.into_dimensions() {
                             Err(e) => {
-                                eprintln!("Failed to decode image dimensions: {}", e);
-                                return None;
+                                eprintln!(
+                                    "Failed to decode image dimensions: {} Skipping: {:?}",
+                                    e, p.0
+                                );
+                                return false;
                             }
                             Ok((width, height)) => {
                                 if width > max_width || height > max_height {
@@ -131,13 +134,13 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                                             p.0, width, height
                                         );
                                     }
-                                    return None;
+                                    return false;
                                 }
                             }
                         },
                     };
                 }
-                return Some(p);
+                return true;
             })
             .collect();
 
