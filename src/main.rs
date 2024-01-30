@@ -66,7 +66,7 @@ fn main() -> Result<()> {
         exclude.append(&mut parsed);
     }
 
-    let limit = matches.get_one::<usize>("limit").map(|x| *x);
+    let scan_limit = matches.get_one::<usize>("scan-limit").map(|x| *x);
     let debug = matches.get_flag("verbose");
     let max_size = matches.get_one::<String>("max-size").map(|x| {
         const ERR: &str = "invalid max-size: should be widthxheight";
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
             index::IndexOptions {
                 lang,
                 debug,
-                limit,
+                limit: scan_limit,
                 exclude,
                 rescan: matches.get_flag("rescan"),
                 subdirs: matches.get_flag("no-subdirs"),
@@ -98,7 +98,10 @@ fn main() -> Result<()> {
 
     let queries = matches.get_many::<String>("QUERIES");
     if let Some(queries) = queries {
-        let results = db.search(queries.map(|x| x.as_ref()).collect())?;
+        let results = db.search(
+            queries.map(|x| x.as_ref()).collect(),
+            *matches.get_one::<usize>("limit").unwrap(),
+        )?;
         if debug {
             println!("{:#?}", results)
         } else {
@@ -148,11 +151,12 @@ Excluded items will be unindexed until someone fixes that."
             arg!(-m --"max-size" <RES> "Ignore images that are larger then WIDTHxHEIGHT"),
             arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("no-subdirs"),
             arg!(-v --verbose "Print debug messages"),
+            arg!(-l --limit "Max amount of results").value_parser(value_parser!(usize)).default_value("100"),
             arg!(--"no-subdirs" "Do not recurse into subdirectories")
                 .action(clap::ArgAction::SetFalse),
             // maybe something for symlinks
             arg!(--pwd <PWD> "Set pwd").hide(true),
-            arg!(--limit <LIMIT> "Set limit")
+            arg!(--scan-limit <LIMIT> "Set limit")
                 .hide(true)
                 .value_parser(value_parser!(usize)),
             arg!(--"chunk-size" <SIZE> "Set chunk size")

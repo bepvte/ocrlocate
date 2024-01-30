@@ -3,7 +3,7 @@ use std::time::UNIX_EPOCH;
 use std::{env, fs};
 
 use anyhow::{Context, Result};
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct DB {
     conn: Connection,
@@ -147,7 +147,7 @@ impl DB {
             .unwrap()
     }
 
-    pub fn search(&mut self, queries: Vec<&str>) -> Result<Vec<SearchResult>> {
+    pub fn search(&mut self, queries: Vec<&str>, limit: usize) -> Result<Vec<SearchResult>> {
         let query = format!(r#""{}""#, queries.join(" ").escape_default()); // TODO: support complex queries
 
         let mut stmt = self
@@ -158,7 +158,7 @@ impl DB {
                     FROM images_fts
                     INNER JOIN images ON images_fts.rowid = images.id AND images.path LIKE ?2 ESCAPE "\"
                     WHERE images_fts.result MATCH ?1 ORDER BY RANK
-                    LIMIT 50;
+                    LIMIT ?3;
                 "#,
             )
             .unwrap();
@@ -167,7 +167,7 @@ impl DB {
             .into_os_string()
             .into_string()
             .expect("path should be valid utf-8");
-        let results = stmt.query_and_then([query, path_to_like(&pwd)], |row| {
+        let results = stmt.query_and_then(params![query, path_to_like(&pwd), limit], |row| {
             Ok(SearchResult {
                 contents: row.get(0)?,
                 path: row.get(1)?,

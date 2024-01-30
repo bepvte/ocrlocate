@@ -181,6 +181,8 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .define("GRAPHICS_DISABLE", "ON")
         .define("DISABLE_ARCHIVE", "ON")
         .define("DISABLE_CURL", "ON")
+        .cflag("-DTESSERACT_IMAGEDATA_AS_PIX")
+        .cxxflag("-DTESSERACT_IMAGEDATA_AS_PIX")
         .build();
 
     println!(
