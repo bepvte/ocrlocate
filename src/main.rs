@@ -113,10 +113,8 @@ fn cli() -> Command {
             arg!(-l --lang <LANG> "Tesseract language code")
                 .default_value("eng")
                 .long_help(
-                    "Tesseract language identifier. Language package must
-be installed (such as tesseract-ocr-eng). Only affects
-indexing of new images, so its recommended to delete
-the database when changed.",
+                    "Tesseract language identifier. Language package must be installed (such as tesseract-ocr-eng). Only affects
+indexing of new images, so its recommended to delete the database when changed.",
                 )
                 .value_parser(|e: &str| -> Result<String, &'static str> {
                     if e.len() != 3 || e.contains(['.', '/', '\\']) || !e.is_ascii() {
@@ -129,7 +127,8 @@ the database when changed.",
             arg!(-t --threads <THREADS> "Set threads").value_parser(value_parser!(usize)),
             arg!(-x --exclude <PATTERN> ... "Exclude directories and paths matching this pattern").long_help(
                 "Exclude directories and paths matching a `glob` pattern: https://docs.rs/glob/latest/glob/struct.Pattern.html
-                Matched directories will not be descended into."
+Matched directories will not be descended into.
+Excluded items will be unindexed until someone fixes that."
             ),
             arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("no-subdirs"),
             arg!(-v --verbose "Print debug messages"),
