@@ -1,8 +1,13 @@
 [package]
 name = "ocrlocate"
 version = "0.1.0"
+authors = ["bep"]
+license = "MIT OR Apache-2.0"
 edition = "2021"
 description = "Index and search a directory of images with OCR (optical character recognition)"
+repository = "https://github.com/bepvte/ocrlocate"
+keywords = ["ocr", "image", "tesseract"]
+categories = ["command-line-utilities", "multimedia::images"]
 
 [features]
 bundled = ["tesseract-sys/bundled"]
