@@ -10,7 +10,7 @@ keywords = ["ocr", "image", "tesseract"]
 categories = ["command-line-utilities", "multimedia::images"]
 
 [features]
-bundled = ["tesseract-sys/bundled"]
+bundled = ["leptess/bundled"]
 
 [dependencies]
 anyhow = "1.0.79"
@@ -18,18 +18,18 @@ clap = { version = "4.4.18", features = ["cargo", "string", "env"] }
 dirs = "5.0.1"
 itertools = "0.12.0"
 kdam = { version = "0.5.1", features = ["rayon"] }
-leptess = "=0.14.0"
-leptonica-sys = "0.4.7"
+leptess = { workspace = true }
 rayon = "1.8.1"
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 walkdir = "2.4.0"
-tesseract-sys = { path = "./tesseract-sys", version = "=0.5.15" }
 glob = "0.3.1"
 image = { version = "0.24.8", default-features = false, features = ["webp", "png", "jpeg", "bmp", "gif"] }
 tikv-jemallocator = { version = "0.5.4", features = ["unprefixed_malloc_on_supported_platforms"] }
-
-[patch.crates-io]
-tesseract-sys = { path = "./tesseract-sys" }
+leptonica-plumbing = { workspace = true }
 
 [workspace]
-members = ["tesseract-sys"]
+members = ["libs/*"]
+
+[workspace.dependencies]
+leptess = { path = "./libs/leptess" }
+leptonica-plumbing = { path = "./libs/leptonica-plumbing" }

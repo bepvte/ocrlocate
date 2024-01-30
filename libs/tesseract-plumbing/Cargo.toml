@@ -1,0 +1,23 @@
+[package]
+name = "tesseract-plumbing"
+version = "0.11.1"
+authors = ["Chris Couzens <ccouzens@gmail.com>"]
+edition = "2018"
+description = "Safe wrapper of `tesseract-sys`"
+homepage = "https://github.com/ccouzens/tesseract-plumbing"
+repository = "https://github.com/ccouzens/tesseract-plumbing"
+readme = "README.md"
+keywords = ["leptonica", "tesseract", "ocr", "image"]
+license = "MIT"
+[dependencies]
+tesseract-sys = { version = "~0.6.2", path = "../tesseract-sys" }
+leptonica-plumbing = { version = "1.0", path = "../leptonica-plumbing" }
+thiserror = "1.0"
+
+[dev-dependencies]
+image = "0.24.7"
+
+[features]
+default = ["tesseract_5_2"]
+tesseract_5_2 = []
+bundled = ["tesseract-sys/bundled"]

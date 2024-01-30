@@ -1,6 +1,6 @@
 [package]
 name = "tesseract-sys"
-version = "0.5.15"
+version = "0.6.2"
 authors = ["Kevin Kwok <antimatter15@gmail.com>", "Chris Couzens <ccouzens@gmail.com>"]
 description = "Rust Bindings for Tesseract OCR"
 license = "MIT"
@@ -23,5 +23,5 @@ bindgen = "0.64"
 cmake = { version = "0.1.50", optional = true }
 [target.'cfg(windows)'.build-dependencies]
 vcpkg = "0.2.8"
-[target.'cfg(any(target_os="macos", target_os="linux"))'.build-dependencies]
+[target.'cfg(any(target_os="macos", target_os="linux", target_os="freebsd"))'.build-dependencies]
 pkg-config = "0.3.19"

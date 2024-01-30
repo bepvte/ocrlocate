@@ -1,0 +1,16 @@
+[package]
+name = "leptonica-plumbing"
+version = "1.3.0"
+authors = ["Chris Couzens <ccouzens@gmail.com>"]
+edition = "2018"
+description = "Safe wrapper of `leptonica-sys`"
+homepage = "https://github.com/ccouzens/leptonica-plumbing"
+repository = "https://github.com/ccouzens/leptonica-plumbing"
+readme = "README.md"
+keywords = ["leptonica", "image"]
+license = "MIT"
+
+[dependencies]
+leptonica-sys = "~0.4"
+thiserror = "1.0"
+libc = "0.2"
