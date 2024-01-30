@@ -16,13 +16,14 @@ impl DB {
         }
         let conn = Connection::open(path)?;
 
-        conn.pragma_update(None, "journal_mode", "wal")?;
-        conn.pragma_update(None, "synchronous", "normal")?;
+        conn.pragma_update(None, "journal_mode", "wal").unwrap();
+        conn.pragma_update(None, "synchronous", "normal")?; // TODO: maybe not
 
-        let user_version: i32 =
-            conn.query_row("SELECT user_version FROM pragma_user_version", [], |row| {
+        let user_version: i32 = conn
+            .query_row("SELECT user_version FROM pragma_user_version", [], |row| {
                 row.get(0)
-            })?;
+            })
+            .unwrap();
 
         let db = DB { conn };
         match user_version {
@@ -51,7 +52,8 @@ impl DB {
             PRAGMA user_version = 1;
             COMMIT;
             "#,
-        )?;
+        )
+        .with_context(|| "creating tables")?;
 
         Ok(())
     }
