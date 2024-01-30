@@ -4,6 +4,7 @@ use std::{env, iter};
 
 use anyhow::Result;
 use glob::Pattern;
+use image::io::Reader as ImageReader;
 use itertools::{Either, Itertools};
 use kdam::{BarBuilder, BarExt};
 use rayon::prelude::*;
@@ -21,6 +22,7 @@ pub struct IndexOptions {
     pub subdirs: bool,
     pub chunksize: usize,
     pub cleanup: bool,
+    pub max_dimensions: Option<(u32, u32)>,
 }
 
 pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> {
@@ -102,10 +104,35 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let chunk: Vec<_> = chunk
             .into_iter()
             .filter_map(|p| {
+                if let Some((max_width, max_height)) = options.max_dimensions {
+                    let img = ImageReader::open(&p.0)
+                        .expect("cant open image file to read")
+                        .with_guessed_format();
+                    match img {
+                        Err(_) => {
+                            eprintln!("Failed to read image to check dimensions: {:?}", p.0);
+                            return None;
+                        }
+                        Ok(img) => match img.into_dimensions() {
+                            Err(e) => {
+                                eprintln!("Failed to decode image dimensions: {}", e);
+                                return None;
+                            }
+                            Ok((width, height)) => {
+                                if width > max_width || height > max_height {
+                                    eprintln!(
+                                        "skipping image: {:?} with dimensions {}x{}",
+                                        p.0, width, height
+                                    );
+                                    return None;
+                                }
+                            }
+                        },
+                    };
+                }
                 if options.rescan {
                     return Some(p);
                 }
-                //todo, cleanup db of removed images
                 if db.is_indexed(&p.0, &p.1) {
                     db.unmark_file(&p.0);
                     abar.lock().unwrap().update(1).unwrap();

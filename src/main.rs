@@ -9,15 +9,13 @@ use anyhow::{anyhow, Result};
 use clap::{arg, crate_description, crate_version, value_parser, Arg, Command};
 use dirs::data_local_dir;
 use glob::Pattern;
+use itertools::Itertools;
 
 use crate::db::DB;
 use crate::ocr::Ocr;
 
 fn main() -> Result<()> {
     let matches = cli().get_matches();
-
-    // needed here because ocr::new is in threads
-    env::set_var("OMP_THREAD_LIMIT", "1");
 
     let lang: String = matches.get_one::<String>("lang").unwrap().to_owned();
 
@@ -62,21 +60,30 @@ fn main() -> Result<()> {
 
     let limit = matches.get_one::<usize>("limit").map(|x| *x);
     let debug = matches.get_flag("verbose");
+    let max_size = matches.get_one::<String>("max-size").map(|x| {
+        const ERR: &str = "invalid max-size: should be widthxheight";
+        x.split('x')
+            .map(|x| x.parse().expect(ERR))
+            .collect_tuple::<(_, _)>()
+            .expect(ERR)
+    });
 
     let mut db = DB::new(dbpath)?;
     if !matches.get_flag("no-index") {
+        env::set_var("OMP_THREAD_LIMIT", "1");
         index::index_dir(
             &mut db,
             &env::current_dir().expect("current dir should be accessible"),
             index::IndexOptions {
                 lang,
-                limit,
                 debug,
+                limit,
                 exclude,
-                cleanup: matches.get_flag("cleanup"),
                 rescan: matches.get_flag("rescan"),
                 subdirs: matches.get_flag("no-subdirs"),
                 chunksize: *matches.get_one::<usize>("chunk-size").unwrap(),
+                cleanup: matches.get_flag("cleanup"),
+                max_dimensions: max_size,
             },
         )?;
     }
@@ -130,13 +137,12 @@ indexing of new images, so its recommended to delete the database when changed."
 Matched directories will not be descended into.
 Excluded items will be unindexed until someone fixes that."
             ),
+            arg!(-m --"max-size" <RES> "Ignore images that are larger then WIDTHxHEIGHT"),
             arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("no-subdirs"),
             arg!(-v --verbose "Print debug messages"),
             arg!(--"no-subdirs" "Do not recurse into subdirectories")
                 .action(clap::ArgAction::SetFalse),
             // maybe something for symlinks
-            // max res !!
-            // exclude paths !!!
             arg!(--pwd <PWD> "Set pwd").hide(true),
             arg!(--limit <LIMIT> "Set limit")
                 .hide(true)

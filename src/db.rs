@@ -146,7 +146,6 @@ impl DB {
 
         let mut stmt = self
             .conn
-            // TODO: limit to current directory?
             .prepare_cached(
                 r#"
                 SELECT snippet(images_fts, -1, '[', ']', '..', 64), images.path, images.modtime
