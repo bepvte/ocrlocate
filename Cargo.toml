@@ -26,6 +26,7 @@ walkdir = "2.4.0"
 tesseract-sys = { path = "./tesseract-sys", version = "=0.5.15" }
 glob = "0.3.1"
 image = { version = "0.24.8", default-features = false, features = ["webp", "png", "jpeg", "bmp", "gif"] }
+tikv-jemallocator = { version = "0.5.4", features = ["unprefixed_malloc_on_supported_platforms"] }
 
 [patch.crates-io]
 tesseract-sys = { path = "./tesseract-sys" }

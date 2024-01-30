@@ -104,6 +104,11 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let chunk: Vec<_> = chunk
             .into_iter()
             .filter_map(|p| {
+                if !options.rescan && db.is_indexed(&p.0, &p.1) {
+                    db.unmark_file(&p.0);
+                    abar.lock().unwrap().update(1).unwrap();
+                    return None;
+                }
                 if let Some((max_width, max_height)) = options.max_dimensions {
                     let img = ImageReader::open(&p.0)
                         .expect("cant open image file to read")
@@ -132,14 +137,6 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                         },
                     };
                 }
-                if options.rescan {
-                    return Some(p);
-                }
-                if db.is_indexed(&p.0, &p.1) {
-                    db.unmark_file(&p.0);
-                    abar.lock().unwrap().update(1).unwrap();
-                    return None;
-                }
                 return Some(p);
             })
             .collect();
@@ -162,7 +159,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                             contents: res,
                         }),
                         Err(e) => {
-                            eprintln!("[Error] ocr: {}", e);
+                            eprintln!("[Error] ocr: {} {:?}", e, &ele.0);
                             None
                         }
                     }

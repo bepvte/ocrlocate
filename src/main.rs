@@ -14,6 +14,14 @@ use itertools::Itertools;
 use crate::db::DB;
 use crate::ocr::Ocr;
 
+// reading those images eats so much memory
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 fn main() -> Result<()> {
     let matches = cli().get_matches();
 

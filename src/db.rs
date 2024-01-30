@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use std::{env, fs};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension};
 
 pub struct DB {
@@ -94,16 +94,20 @@ impl DB {
                 .map(|res| {
                     let path = res.path.to_str().expect("paths should be valid unicode");
                     let mtime = metadata_to_seconds(&res.metadata);
-                    metadata_stmt
-                        .query_row((path, mtime), |row| row.get(0))
-                        .map(|rowid: i64| (rowid, res.contents))
-                        .map_err(anyhow::Error::new)
+                    let rowid = metadata_stmt
+                        .query_row((path, mtime), |row| row.get::<_, i64>(0))
+                        .with_context(|| format!("metadata insertion: {:?}", (path, mtime)))
+                        .unwrap();
+                    (rowid, res.contents)
                 })
-                .collect::<Result<Vec<_>>>()?
+                .collect::<Vec<_>>()
                 .into_iter()
-                .map(|(id, contents)| fts_stmt.execute((id, contents)).map_err(anyhow::Error::new))
-                .collect::<Result<Vec<_>>>()?
-                .iter()
+                .map(|(id, contents)| {
+                    fts_stmt
+                        .execute((id, &contents))
+                        .with_context(|| format!("fts insertion: {:?}", (id, &contents)))
+                        .unwrap()
+                })
                 .sum()
         };
         tx.commit().unwrap();
