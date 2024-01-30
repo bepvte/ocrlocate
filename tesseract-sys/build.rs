@@ -173,7 +173,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
                 "OFF"
             },
         )
-        // .define("ENABLE_NATIVE", "ON")
+        .define("ENABLE_NATIVE", "ON")
         .define("DISABLE_LEGACY_ENGINE", "ON")
         .define("BUILD_TRAINING_TOOLS", "OFF")
         .define("BUILD_SHARED_LIBS", "OFF")
@@ -224,7 +224,7 @@ fn main() {
     // Tell cargo to tell rustc to link the system tesseract
     // and leptonica shared libraries.
     let clang_extra_include = find_tesseract_system_lib();
-    
+
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     capi_bindings(&clang_extra_include)

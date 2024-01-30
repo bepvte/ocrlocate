@@ -8,6 +8,7 @@ use std::{env, fs};
 use anyhow::{anyhow, Result};
 use clap::{arg, crate_description, crate_version, value_parser, Arg, Command};
 use dirs::data_local_dir;
+use glob::Pattern;
 
 use crate::db::DB;
 use crate::ocr::Ocr;
@@ -51,8 +52,15 @@ fn main() -> Result<()> {
         builder.build_global().unwrap();
     }
 
-    let limit = matches.get_one::<usize>("limit").map(|x| *x);
+    let mut exclude = Vec::from(["*/.cache", "*/.thumb*"].map(|x| Pattern::new(x).unwrap()));
+    if let Some(patterns) = matches.get_many::<String>("exclude") {
+        let mut parsed: Vec<Pattern> = patterns
+            .map(|x| Pattern::new(&format!("*/{}", x)).expect("invalid pattern"))
+            .collect();
+        exclude.append(&mut parsed);
+    }
 
+    let limit = matches.get_one::<usize>("limit").map(|x| *x);
     let debug = matches.get_flag("verbose");
 
     let mut db = DB::new(dbpath)?;
@@ -64,6 +72,9 @@ fn main() -> Result<()> {
                 lang,
                 limit,
                 debug,
+                exclude,
+                cleanup: matches.get_flag("cleanup"),
+                rescan: matches.get_flag("rescan"),
                 subdirs: matches.get_flag("no-subdirs"),
                 chunksize: *matches.get_one::<usize>("chunk-size").unwrap(),
             },
@@ -116,11 +127,17 @@ the database when changed.",
             arg!(-n --"no-index" "Do not index the directory first"),
             arg!(-r --"rescan" "Ignore file modified time and force rescan"),
             arg!(-t --threads <THREADS> "Set threads").value_parser(value_parser!(usize)),
+            arg!(-x --exclude <PATTERN> ... "Exclude directories and paths matching this pattern").long_help(
+                "Exclude directories and paths matching a `glob` pattern: https://docs.rs/glob/latest/glob/struct.Pattern.html
+                Matched directories will not be descended into."
+            ),
+            arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("no-subdirs"),
             arg!(-v --verbose "Print debug messages"),
             arg!(--"no-subdirs" "Do not recurse into subdirectories")
                 .action(clap::ArgAction::SetFalse),
             // maybe something for symlinks
             // max res !!
+            // exclude paths !!!
             arg!(--pwd <PWD> "Set pwd").hide(true),
             arg!(--limit <LIMIT> "Set limit")
                 .hide(true)
@@ -130,7 +147,7 @@ the database when changed.",
                 .value_parser(value_parser!(usize))
                 .default_value("900"),
             arg!(--"dump-scan" "Dump an OCR result and exit").hide(true),
-            Arg::new("QUERIES") // required() error is ugly here
+            Arg::new("QUERIES")
                 .num_args(..)
                 .trailing_var_arg(true)
                 .help("Strings to search for"),

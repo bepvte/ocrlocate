@@ -24,6 +24,7 @@ rayon = "1.8.1"
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 walkdir = "2.4.0"
 tesseract-sys = { path = "./tesseract-sys", version = "=0.5.15" }
+glob = "0.3.1"
 
 [patch.crates-io]
 tesseract-sys = { path = "./tesseract-sys" }

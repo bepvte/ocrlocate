@@ -1,8 +1,9 @@
-use std::iter;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::{env, iter};
 
 use anyhow::Result;
+use glob::Pattern;
 use itertools::{Either, Itertools};
 use kdam::{BarBuilder, BarExt};
 use rayon::prelude::*;
@@ -15,8 +16,11 @@ pub struct IndexOptions {
     pub lang: String,
     pub debug: bool,
     pub limit: Option<usize>,
+    pub exclude: Vec<Pattern>,
+    pub rescan: bool,
     pub subdirs: bool,
     pub chunksize: usize,
+    pub cleanup: bool,
 }
 
 pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> {
@@ -27,30 +31,38 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         wd = wd.max_depth(1);
     }
 
-    let it = wd.into_iter().filter_map(|res| {
-        let file = match res {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!("Error collecting files: {}", e);
+    let it = wd
+        .into_iter()
+        .filter_entry(|entry| !options.exclude.iter().any(|x| x.matches_path(entry.path())))
+        .filter_map(|res| {
+            let file = match res {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("[Error] collecting files: {}", e);
+                    return None;
+                }
+            };
+            if file.file_type().is_dir() {
                 return None;
+            };
+            if let Some(ext) = file.path().extension() {
+                if indexed_filetypes.contains(&ext.to_str().expect("paths should be valid unicode"))
+                {
+                    return Some(file);
+                }
             }
-        };
-        if file.file_type().is_dir() {
             return None;
-        };
-        if let Some(ext) = file.path().extension() {
-            if indexed_filetypes.contains(&ext.to_str().expect("paths should be valid unicode")) {
-                return Some(file);
-            }
-        }
-        return None;
-    });
+        });
 
     let it = if let Some(limit) = options.limit {
         Either::Left(it.take(limit))
     } else {
         Either::Right(it)
     };
+
+    if options.cleanup {
+        db.mark_for_deletion(&env::current_dir().unwrap());
+    }
 
     let arcbar = Arc::new(Mutex::new(BarBuilder::default().total(0).build().unwrap()));
 
@@ -90,7 +102,12 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let chunk: Vec<_> = chunk
             .into_iter()
             .filter_map(|p| {
+                if options.rescan {
+                    return Some(p);
+                }
+                //todo, cleanup db of removed images
                 if db.is_indexed(&p.0, &p.1) {
+                    db.unmark_file(&p.0);
                     abar.lock().unwrap().update(1).unwrap();
                     return None;
                 }
@@ -116,7 +133,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                             contents: res,
                         }),
                         Err(e) => {
-                            eprintln!("Error during ocr: {}", e);
+                            eprintln!("[Error] ocr: {}", e);
                             None
                         }
                     }
@@ -129,6 +146,11 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         if options.debug {
             eprintln!("Saved {count} to the db");
         }
+    }
+
+    let deleted = db.sweep_deletions();
+    if options.debug {
+        eprintln!("Deleted {deleted} stale entries");
     }
 
     Ok(())

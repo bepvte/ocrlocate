@@ -456,6 +456,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
+ "glob",
  "itertools",
  "kdam",
  "leptess",
