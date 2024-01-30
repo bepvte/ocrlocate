@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{env, path::Path};
+use std::path::Path;
 
 use leptess::LepTess;
 use leptonica_sys;
@@ -11,8 +11,6 @@ pub struct Ocr {
 impl Ocr {
     pub fn new(lang: &str, debug: bool) -> Result<Self> {
         let mut leptess = LepTess::new(None, lang)?;
-
-        env::set_var("OMP_THREAD_LIMIT", "1");
 
         if !debug {
             leptess

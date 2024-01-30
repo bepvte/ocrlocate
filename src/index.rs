@@ -1,17 +1,15 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::iter;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use kdam::{BarBuilder, BarExt};
 use rayon::prelude::*;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 use crate::db::OcrResult;
 use crate::{db::DB, ocr::Ocr};
-
-type PathM = (PathBuf, fs::Metadata);
 
 pub struct IndexOptions {
     pub lang: String,
@@ -23,7 +21,6 @@ pub struct IndexOptions {
 
 pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> {
     let indexed_filetypes = ["png", "jpeg", "jpg", "gif", "webp"];
-    let arcbar = Arc::new(Mutex::new(BarBuilder::default().total(0).build().unwrap()));
 
     let mut wd = WalkDir::new(path).follow_links(true);
     if !options.subdirs {
@@ -34,7 +31,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let file = match res {
             Ok(file) => file,
             Err(e) => {
-                println!("Error collecting files: {}", e);
+                eprintln!("Error collecting files: {}", e);
                 return None;
             }
         };
@@ -49,19 +46,27 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         return None;
     });
 
-    let it: Box<dyn Iterator<Item = DirEntry>> = if let Some(limit) = options.limit {
-        Box::new(it.take(limit))
+    let it = if let Some(limit) = options.limit {
+        Either::Left(it.take(limit))
     } else {
-        Box::new(it)
+        Either::Right(it)
     };
 
-    // I chunk the thing into vectors so rayon can use it correctly, but this ends up
-    // leading to a situation where we are waiting on one large image to finish processing.
-    let chunks = it.chunks(options.chunksize);
+    let arcbar = Arc::new(Mutex::new(BarBuilder::default().total(0).build().unwrap()));
 
-    for citer in chunks.into_iter() {
+    // the chunking starves the rayon pool but its fine
+    let chunks = it.chunks(options.chunksize);
+    let mut tup = chunks
+        .into_iter()
+        .map(|x| x.collect())
+        .chain(iter::once(vec![]))
+        .tuple_windows::<(_, _)>();
+
+    let mut first_iter = true;
+    while let Some((c1, c2)) = tup.next() {
         let abar = arcbar.clone();
-        let chunk: Vec<PathM> = citer
+        let chunk: Vec<_> = c1
+            .into_iter()
             .filter_map(move |file| match file.metadata() {
                 Ok(metadata) => Some((file.path().to_owned(), metadata)),
                 Err(e) => {
@@ -74,10 +79,15 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
             })
             .collect();
 
-        arcbar.clone().lock().unwrap().total += chunk.len();
+        arcbar.lock().unwrap().total += if first_iter {
+            first_iter = false;
+            chunk.len() + c2.len()
+        } else {
+            c2.len()
+        };
 
         let abar = arcbar.clone();
-        let chunk: Vec<PathM> = chunk
+        let chunk: Vec<_> = chunk
             .into_iter()
             .filter_map(|p| {
                 if db.is_indexed(&p.0, &p.1) {
@@ -87,40 +97,39 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                 return Some(p);
             })
             .collect();
-        drop(abar);
 
         let abar = arcbar.clone();
-        let (results, errors): (Vec<_>, Vec<_>) = chunk
+        let results: Vec<OcrResult> = chunk
             .par_iter()
             .map_init(
                 || Ocr::new(&options.lang, options.debug).unwrap(),
                 move |ocr, ele| {
                     if options.debug {
-                        println!("now working on {}", &ele.0.to_str().unwrap());
+                        eprintln!("now working on {}", &ele.0.to_str().unwrap());
                     }
                     let res = ocr.scan(&ele.0);
                     abar.lock().unwrap().update(1).unwrap();
-                    return res.map(|x| OcrResult {
-                        path: ele.0.clone(),
-                        metadata: ele.1.clone(),
-                        contents: x,
-                    });
+                    match res {
+                        Ok(res) => Some(OcrResult {
+                            path: ele.0.clone(),
+                            metadata: ele.1.clone(),
+                            contents: res,
+                        }),
+                        Err(e) => {
+                            eprintln!("Error during ocr: {}", e);
+                            None
+                        }
+                    }
                 },
             )
-            .partition(Result::is_ok);
-
-        arcbar.clone().lock().unwrap().clear().unwrap();
-
-        for err in errors {
-            println!("Error during ocr: {}", err.unwrap_err())
-        }
-
-        let results = results.into_iter().map(|x| x.unwrap()).collect_vec();
+            .filter_map(|x| x)
+            .collect();
 
         let count = db.save_results(results)?;
         if options.debug {
-            println!("Saved {count} to the db");
+            eprintln!("Saved {count} to the db");
         }
     }
+
     Ok(())
 }

@@ -5,7 +5,7 @@ mod ocr;
 use std::path::PathBuf;
 use std::{env, fs};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{arg, crate_description, crate_version, value_parser, Arg, Command};
 use dirs::data_local_dir;
 
@@ -14,6 +14,9 @@ use crate::ocr::Ocr;
 
 fn main() -> Result<()> {
     let matches = cli().get_matches();
+
+    // needed here because ocr::new is in threads
+    env::set_var("OMP_THREAD_LIMIT", "1");
 
     let lang: String = matches.get_one::<String>("lang").unwrap().to_owned();
 
@@ -50,6 +53,8 @@ fn main() -> Result<()> {
 
     let limit = matches.get_one::<usize>("limit").map(|x| *x);
 
+    let debug = matches.get_flag("verbose");
+
     let mut db = DB::new(dbpath)?;
     if !matches.get_flag("no-index") {
         index::index_dir(
@@ -57,12 +62,26 @@ fn main() -> Result<()> {
             &env::current_dir().expect("current dir should be accessible"),
             index::IndexOptions {
                 lang,
-                debug: matches.get_flag("verbose"),
                 limit,
+                debug,
                 subdirs: matches.get_flag("no-subdirs"),
                 chunksize: *matches.get_one::<usize>("chunk-size").unwrap(),
             },
         )?;
+    }
+
+    let queries = matches.get_many::<String>("QUERIES");
+    if let Some(queries) = queries {
+        let results = db.search(queries.map(|x| x.as_ref()).collect())?;
+        if debug {
+            println!("{:#?}", results)
+        } else {
+            for x in results {
+                println!("{}\t\t{}", x.contents.escape_debug(), x.path);
+            }
+        }
+    } else {
+        return Err(anyhow!("No queries were provided"));
     }
 
     Ok(())
@@ -101,7 +120,7 @@ the database when changed.",
             arg!(--"no-subdirs" "Do not recurse into subdirectories")
                 .action(clap::ArgAction::SetFalse),
             // maybe something for symlinks
-            // max res
+            // max res !!
             arg!(--pwd <PWD> "Set pwd").hide(true),
             arg!(--limit <LIMIT> "Set limit")
                 .hide(true)

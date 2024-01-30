@@ -1,8 +1,6 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::UNIX_EPOCH,
-};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use rusqlite::{Connection, OptionalExtension};
@@ -32,8 +30,6 @@ impl DB {
             1 => (),
             x => panic!("Database schema version is too high: {x}"),
         };
-
-        println!("Isize: {user_version}");
 
         Ok(db)
     }
@@ -113,13 +109,43 @@ impl DB {
         Ok(rowchanges)
     }
 
-    // pub fn search(queries: Vec<String>) -> Vec<OcrResult> {}
+    pub fn search(&mut self, queries: Vec<&str>) -> Result<Vec<SearchResult>> {
+        let query = format!(r#""{}""#, queries.join(" ")); // TODO: support complex queries
+
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                r#"
+                SELECT snippet(images_fts, -1, '[', ']', '..', 64), images.path, images.modtime
+                    FROM images_fts
+                    INNER JOIN images ON images_fts.rowid = images.id
+                    WHERE images_fts.result MATCH ?1 ORDER BY RANK
+                    LIMIT 50;
+                "#,
+            )
+            .unwrap();
+        let results = stmt.query_and_then([query], |row| {
+            Ok(SearchResult {
+                contents: row.get(0)?,
+                path: row.get(1)?,
+                time: row.get(2)?,
+            })
+        })?;
+        results.collect()
+    }
 }
 
 #[derive(Debug)]
 pub struct OcrResult {
     pub path: PathBuf,
     pub metadata: fs::Metadata,
+    pub contents: String,
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    pub path: String,
+    pub time: u64,
     pub contents: String,
 }
 
