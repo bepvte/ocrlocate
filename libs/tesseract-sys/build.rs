@@ -203,7 +203,9 @@ fn find_tessdata_path() -> String {
     }
     for p in [
         "/usr/share/tessdata",
+        "/usr/share/tesseract-ocr/4.00/tessdata",
         "/usr/share/tesseract/tessdata",
+        "/usr/share/tesseract-ocr/4/tessdata",
         "/usr/share/tesseract-ocr/5/tessdata",
     ] {
         let path = Path::new(p);
