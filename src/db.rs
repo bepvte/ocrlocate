@@ -45,7 +45,7 @@ impl DB {
                 id INTEGER PRIMARY KEY ASC,
                 path TEXT UNIQUE NOT NULL,
                 modtime INTEGER NOT NULL,
-                mark_delete BOOL DEFAULT FALSE,
+                mark_delete BOOL DEFAULT FALSE
             );
             CREATE INDEX mark_delete_idx ON images (mark_delete);
             CREATE VIRTUAL TABLE images_fts USING fts5(result, tokenize='trigram case_sensitive 1');
