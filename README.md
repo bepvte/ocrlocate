@@ -9,5 +9,3 @@ Run `cargo install --git https://github.com/bepvte/ocrlocate`.
 
 ## Performance
 To increase the performance by around 3-4 images per second, compile the bundled tesseract which should not use the slower OpenMP functions with `cargo install --git https://github.com/bepvte/ocrlocate --features bundled`.
-
-A surprising amount (5%) of CPU time is used on the zlib decoding for libpng. For comparison, around 15% of cpu time is spent on the LSTM kernel for tesseract.
