@@ -11,6 +11,6 @@ keywords = ["leptonica", "image"]
 license = "MIT"
 
 [dependencies]
-leptonica-sys = "~0.4"
+leptonica-sys = { version = "~0.4", path = "../leptonica-sys" }
 thiserror = "1.0"
 libc = "0.2"
