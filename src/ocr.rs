@@ -5,6 +5,7 @@ use std::ffi::CString;
 use leptess::tesseract::TessApi;
 use leptonica_plumbing::{self, leptonica_sys};
 
+#[derive(Debug)]
 pub struct Ocr {
     leptess: TessApi,
 }
@@ -48,5 +49,42 @@ impl Ocr {
 fn set_log_level(level: u32) {
     unsafe {
         leptonica_sys::setMsgSeverity(level.try_into().unwrap());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::iter;
+    use std::process::Command;
+    use tempfile::NamedTempFile;
+    use tempfile::TempPath;
+
+    fn test_image() -> TempPath {
+        let path = NamedTempFile::new().unwrap().into_temp_path();
+        let result = Command::new("convert")
+            .args(
+                concat!(
+                    "-background lightblue -fill white ",
+                    "-size 300x70 -pointsize 24 -gravity east ",
+                    "label:haystackhayneedle"
+                )
+                .split(' ')
+                .chain(iter::once(
+                    format!("png:{}", path.to_str().unwrap()).as_str(),
+                )),
+            )
+            .status()
+            .unwrap();
+        assert!(result.success());
+        path
+    }
+    #[test]
+    fn scan() -> Result<()> {
+        let mut ocr = Ocr::new("eng", true).unwrap();
+        let image = test_image();
+        let result = ocr.scan(Path::from_path(&image).unwrap()).unwrap();
+        assert!(result.contains("needle"));
+        Ok(())
     }
 }

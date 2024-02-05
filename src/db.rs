@@ -220,7 +220,6 @@ fn path_to_like(s: &Path) -> String {
 }
 
 #[cfg(test)]
-#[cfg(never)]
 mod tests {
     use super::*;
     use std::fs::File;
@@ -282,7 +281,7 @@ mod tests {
         let mock_metadata = fs::metadata(".").unwrap();
         let x = |contents: &'static str| -> OcrResult {
             OcrResult {
-                path: PathBuf::try_from(temp.path().join(contents.replace(" ", "_"))).unwrap(),
+                path: PathBuf::try_from(temp.path().join(contents.replace(' ', "_"))).unwrap(),
                 metadata: mock_metadata.clone(),
                 contents: contents.into(),
             }
