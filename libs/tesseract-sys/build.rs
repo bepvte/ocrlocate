@@ -121,7 +121,7 @@ fn public_types_bindings(clang_extra_include: &[String]) -> String {
         .replace("tesseract_k", "k")
 }
 
-#[cfg(all(feature = "bundled"))]
+#[cfg(feature = "bundled")]
 fn find_tesseract_system_lib() -> Vec<String> {
     use cmake::Config;
     use std::process::Command;

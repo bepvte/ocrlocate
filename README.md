@@ -8,4 +8,4 @@ You will need tesseract language packs for your target language, and libleptonic
 Run `cargo install --git https://github.com/bepvte/ocrlocate`.
 
 ## Performance
-To increase the performance by around 3-4 images per second, compile the bundled tesseract which should not use the slower OpenMP functions with `cargo install --git https://github.com/bepvte/ocrlocate --features bundled`.
+To increase the performance by around 3-4 images per second, compile the bundled tesseract which should not use the slower OpenMP functions with `cargo install --git https://github.com/bepvte/ocrlocate -vv --features bundled`.

@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use camino::Utf8Path as Path;
 use std::ffi::CString;
-use std::path::Path;
 
 use leptess::tesseract::TessApi;
 use leptonica_plumbing::{self, leptonica_sys};
@@ -11,7 +11,11 @@ pub struct Ocr {
 
 impl Ocr {
     pub fn new(lang: &str, debug: bool) -> Result<Self> {
-        let mut leptess = TessApi::new(None, lang)?;
+        if lang.len() != 3 || lang.contains(['.', '/', '\\']) || !lang.is_ascii() {
+            return Err(anyhow!("Invalid language code: {:?}", lang));
+        }
+
+        let mut leptess = TessApi::new(None, &lang.to_ascii_lowercase())?;
 
         if !debug {
             leptess
@@ -27,7 +31,7 @@ impl Ocr {
         Ok(Ocr { leptess })
     }
     pub fn scan(&mut self, img: &Path) -> Result<String> {
-        let filename = CString::new(img.to_str().unwrap()).expect("null in filename");
+        let filename = CString::new(img.as_str()).expect("null in filename");
         let cpix = leptonica_plumbing::Pix::read_with_hint(
             &filename,
             leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA,

@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
+use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
+use std::fs;
 use std::time::UNIX_EPOCH;
-use std::{env, fs};
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -12,12 +12,12 @@ pub struct DB {
 impl DB {
     pub fn new(path: &Path) -> Result<Self> {
         if !path.try_exists()? {
-            println!("Note: creating new database")
+            eprintln!("Note: creating new database")
         }
         let conn = Connection::open(path)?;
 
         conn.pragma_update(None, "journal_mode", "wal").unwrap();
-        conn.pragma_update(None, "synchronous", "normal")?; // TODO: maybe not
+        conn.pragma_update(None, "synchronous", "normal").unwrap(); // TODO: maybe not
 
         let user_version: i32 = conn
             .query_row("SELECT user_version FROM pragma_user_version", [], |row| {
@@ -53,7 +53,7 @@ impl DB {
             COMMIT;
             "#,
         )
-        .with_context(|| "creating tables")?;
+        .context("creating tables")?;
 
         Ok(())
     }
@@ -65,11 +65,9 @@ impl DB {
             .unwrap();
         let mtime = metadata_to_seconds(metadata);
         let Some(modtime) = stmt
-            .query_row(
-                [path.to_str().expect("paths should be valid unicode")],
-                |row| row.get(0),
-            )
+            .query_row([path.as_str()], |row| row.get(0))
             .optional()
+            .with_context(|| format!("failed to check if an image was already indexed: {}", path))
             .unwrap()
         else {
             return false;
@@ -77,7 +75,7 @@ impl DB {
         if mtime == modtime {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn save_results(&mut self, results: Vec<OcrResult>) -> Result<usize> {
@@ -94,11 +92,12 @@ impl DB {
             results
                 .into_iter()
                 .map(|res| {
-                    let path = res.path.to_str().expect("paths should be valid unicode");
-                    let mtime = metadata_to_seconds(&res.metadata);
                     let rowid = metadata_stmt
-                        .query_row((path, mtime), |row| row.get::<_, i64>(0))
-                        .with_context(|| format!("metadata insertion: {:?}", (path, mtime)))
+                        .query_row(
+                            (res.path.as_str(), metadata_to_seconds(&res.metadata)),
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .with_context(|| format!("failed to insert metadata: {}", res.path))
                         .unwrap();
                     (rowid, res.contents)
                 })
@@ -107,7 +106,9 @@ impl DB {
                 .map(|(id, contents)| {
                     fts_stmt
                         .execute((id, &contents))
-                        .with_context(|| format!("fts insertion: {:?}", (id, &contents)))
+                        .with_context(|| {
+                            format!("failed to index ocr result: {:?}", (id, &contents))
+                        })
                         .unwrap()
                 })
                 .sum()
@@ -116,38 +117,51 @@ impl DB {
         Ok(rowchanges)
     }
 
+    /// Mark the elements of a directory for deletion in the DB
     pub fn mark_for_deletion(&mut self, path: &Path) {
+        if !path.is_dir() {
+            panic!(
+                "Incorrect usage of `mark_for_deletion`: Path `{}` should be a directory",
+                path
+            );
+        }
+
         self.conn
             .execute(
                 "UPDATE images SET mark_delete = FALSE WHERE mark_delete = TRUE",
                 [],
             )
-            .unwrap();
+            .expect("failed to preliminarily unmark previously marked images for deletion");
         let mut stmt = self
             .conn
-            .prepare_cached("UPDATE images SET mark_delete = TRUE WHERE path LIKE ?1")
-            .unwrap();
+            .prepare_cached("UPDATE images SET mark_delete = TRUE WHERE path LIKE ?1 ESCAPE '#'")
+            .expect("failed to preliminarily mark subdirectory for deletion");
 
-        stmt.execute([path_to_like(path.to_str().unwrap())])
-            .unwrap();
+        stmt.execute([path_to_like(path)]).unwrap();
     }
 
     pub fn unmark_file(&mut self, path: &Path) {
         let mut stmt = self
             .conn
             .prepare_cached("UPDATE images SET mark_delete = FALSE WHERE path = ?1")
+            .with_context(|| format!("failed to unmark image for deletion: {}", path))
             .unwrap();
 
-        stmt.execute([path.to_str().unwrap()]).unwrap();
+        stmt.execute([path.as_str()]).unwrap();
     }
 
     pub fn sweep_deletions(&mut self) -> usize {
         self.conn
             .execute("DELETE FROM images WHERE mark_delete = TRUE", [])
-            .unwrap()
+            .expect("failed to delete marked images")
     }
 
-    pub fn search(&mut self, queries: Vec<&str>, limit: usize) -> Result<Vec<SearchResult>> {
+    pub fn search(
+        &mut self,
+        queries: Vec<&str>,
+        path: &Path,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>> {
         let query = format!(r#""{}""#, queries.join(" ").escape_default()); // TODO: support complex queries
 
         let mut stmt = self
@@ -156,24 +170,21 @@ impl DB {
                 r#"
                 SELECT snippet(images_fts, -1, '[', ']', '..', 64), images.path, images.modtime
                     FROM images_fts
-                    INNER JOIN images ON images_fts.rowid = images.id AND images.path LIKE ?2 ESCAPE "\"
-                    WHERE images_fts.result MATCH ?1 ORDER BY RANK
+                    INNER JOIN images ON images_fts.rowid = images.id AND images.path LIKE ?2 ESCAPE '#'
+                    WHERE images_fts.result MATCH ?1 ORDER BY RANK, images.modtime DESC
                     LIMIT ?3;
                 "#,
             )
             .unwrap();
-        let pwd = env::current_dir()
-            .unwrap()
-            .into_os_string()
-            .into_string()
-            .expect("path should be valid utf-8");
-        let results = stmt.query_and_then(params![query, path_to_like(&pwd), limit], |row| {
-            Ok(SearchResult {
-                contents: row.get(0)?,
-                path: row.get(1)?,
-                time: row.get(2)?,
+        let results = stmt
+            .query_and_then(params![query, path_to_like(path), limit], |row| {
+                Ok(SearchResult {
+                    contents: row.get(0)?,
+                    path: row.get(1)?,
+                    time: row.get(2)?,
+                })
             })
-        })?;
+            .context("failed to query image index")?;
         results.collect()
     }
 }
@@ -194,12 +205,101 @@ pub struct SearchResult {
 
 fn metadata_to_seconds(m: &fs::Metadata) -> u64 {
     m.modified()
-        .expect("system time shouldnt error")
+        .expect("unable to get file time")
         .duration_since(UNIX_EPOCH)
         .expect("duration should be after unix epoch")
         .as_secs()
 }
 
-fn path_to_like(s: &str) -> String {
-    format!("{}%", s.replace("%", "\\%").replace("_", "\\_"))
+fn path_to_like(s: &Path) -> String {
+    let s = s.as_str();
+    format!(
+        "{}%",
+        s.replace('#', "##").replace('%', "#%").replace('_', "#_")
+    )
+}
+
+#[cfg(test)]
+#[cfg(never)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use tempfile::TempDir;
+
+    fn test_db() -> Result<(TempDir, DB)> {
+        let temp = TempDir::new()?;
+        let db = DB::new(&PathBuf::try_from(temp.path().join("temp.db"))?)?;
+        Ok((temp, db))
+    }
+
+    #[test]
+    fn is_indexed() -> Result<()> {
+        let (temp, mut db) = test_db()?;
+        let dummy = PathBuf::try_from(temp.path().join("dummy"))?;
+        File::create(&dummy)?;
+        let dummy_metadata = fs::metadata(&dummy).unwrap();
+        db.save_results(vec![OcrResult {
+            path: dummy.clone(),
+            metadata: dummy_metadata.clone(),
+            contents: "nothing".into(),
+        }])?;
+        assert!(db.is_indexed(&dummy, &dummy_metadata));
+        temp.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn deletion() -> Result<()> {
+        let (temp, mut db) = test_db()?;
+        let not_deleted = PathBuf::try_from(temp.path().join("im_not_going_away"))?;
+        let deleted = PathBuf::try_from(temp.path().join("im_going_away"))?;
+        File::create(&not_deleted)?;
+        File::create(&deleted)?;
+        db.save_results(vec![
+            OcrResult {
+                metadata: fs::metadata(&not_deleted)?,
+                path: not_deleted.clone(),
+                contents: "".into(),
+            },
+            OcrResult {
+                metadata: fs::metadata(&deleted)?,
+                path: deleted.clone(),
+                contents: "".into(),
+            },
+        ])?;
+        assert_eq!(db.sweep_deletions(), 0);
+        db.mark_for_deletion(Path::from_path(temp.path()).unwrap());
+        db.unmark_file(&not_deleted);
+        assert_eq!(db.sweep_deletions(), 1);
+
+        temp.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn search() -> Result<()> {
+        let (temp, mut db) = test_db()?;
+        let mock_metadata = fs::metadata(".").unwrap();
+        let x = |contents: &'static str| -> OcrResult {
+            OcrResult {
+                path: PathBuf::try_from(temp.path().join(contents.replace(" ", "_"))).unwrap(),
+                metadata: mock_metadata.clone(),
+                contents: contents.into(),
+            }
+        };
+        assert_eq!(
+            db.save_results(vec![
+                x("haystack haystack haystack"),
+                x("haystack haystack needle"),
+                x("haystack hayneedle haystack"),
+            ])?,
+            3
+        );
+        let results = db.search(vec!["needle"], Path::new("/"), 40)?;
+        println!("{:?}", results);
+        assert_eq!(results.len(), 2);
+
+        temp.close()?;
+        Ok(())
+    }
 }

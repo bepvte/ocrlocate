@@ -1,8 +1,8 @@
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::{env, iter};
 
 use anyhow::Result;
+use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use glob::Pattern;
 use image::io::Reader as ImageReader;
 use itertools::{Either, Itertools};
@@ -47,13 +47,13 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
             if file.file_type().is_dir() {
                 return None;
             };
-            if let Some(ext) = file.path().extension() {
-                if indexed_filetypes.contains(&ext.to_str().expect("paths should be valid unicode"))
-                {
-                    return Some(file);
+            let path = PathBuf::try_from(file.into_path()).unwrap();
+            if let Some(ext) = path.extension() {
+                if indexed_filetypes.contains(&ext) {
+                    return Some(path);
                 }
             }
-            return None;
+            None
         });
 
     let it = if let Some(limit) = options.limit {
@@ -63,31 +63,27 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
     };
 
     if options.cleanup {
-        db.mark_for_deletion(&env::current_dir().unwrap());
+        db.mark_for_deletion(Path::from_path(&env::current_dir().unwrap()).unwrap());
     }
 
     let arcbar = Arc::new(Mutex::new(BarBuilder::default().total(0).build().unwrap()));
 
     // the chunking starves the rayon pool but its fine
     let chunks = it.chunks(options.chunksize);
-    let mut tup = chunks
+    let tup = chunks
         .into_iter()
         .map(|x| x.collect())
         .chain(iter::once(vec![]))
         .tuple_windows::<(_, _)>();
 
     let mut first_iter = true;
-    while let Some((c1, c2)) = tup.next() {
-        let abar = arcbar.clone();
+    for (c1, c2) in tup {
         let chunk: Vec<_> = c1
             .into_iter()
             .filter_map(move |file| match file.metadata() {
-                Ok(metadata) => Some((file.path().to_owned(), metadata)),
+                Ok(metadata) => Some((file, metadata)),
                 Err(e) => {
-                    abar.lock()
-                        .unwrap()
-                        .write(format!("Error fetching metadata {}", e))
-                        .unwrap();
+                    eprintln!("Error fetching metadata: {}", e);
                     None
                 }
             })
@@ -110,18 +106,16 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                     return false;
                 }
                 if let Some((max_width, max_height)) = options.max_dimensions {
-                    let img = ImageReader::open(&p.0)
-                        .expect("cant open image file to read")
-                        .with_guessed_format();
+                    let img = ImageReader::open(&p.0).and_then(|img| img.with_guessed_format());
                     match img {
                         Err(_) => {
-                            eprintln!("Failed to read image to check dimensions: {:?}", p.0);
+                            eprintln!("Failed to read image to check dimensions: {}", p.0);
                             return false;
                         }
                         Ok(img) => match img.into_dimensions() {
                             Err(e) => {
                                 eprintln!(
-                                    "Failed to decode image dimensions: {} Skipping: {:?}",
+                                    "Failed to decode image dimensions: {} Skipping: {}",
                                     e, p.0
                                 );
                                 return false;
@@ -130,7 +124,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                                 if width > max_width || height > max_height {
                                     if options.debug {
                                         eprintln!(
-                                            "skipping image: {:?} with dimensions {}x{}",
+                                            "skipping image: {} with dimensions {}x{}",
                                             p.0, width, height
                                         );
                                     }
@@ -140,7 +134,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                         },
                     };
                 }
-                return true;
+                true
             })
             .collect();
 
@@ -151,7 +145,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                 || Ocr::new(&options.lang, options.debug).unwrap(),
                 move |ocr, ele| {
                     if options.debug {
-                        eprintln!("now working on {}", &ele.0.to_str().unwrap());
+                        eprintln!("now working on {}", &ele.0);
                     }
                     let res = ocr.scan(&ele.0);
                     abar.lock().unwrap().update(1).unwrap();
@@ -162,7 +156,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                             contents: res,
                         }),
                         Err(e) => {
-                            eprintln!("[Error] ocr: {} {:?}", e, &ele.0);
+                            eprintln!("[Error] ocr: {} {}", e, &ele.0);
                             None
                         }
                     }
