@@ -10,13 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v3
+
       - name: Install dependencies
-        run: sudo apt-get install --no-install-recommends -y libtesseract-dev imagemagick
+        run: sudo apt-get install --no-install-recommends -y libtesseract-dev imagemagick tesseract-ocr-eng fonts-liberation2
+
+      - name: Refresh font cache
+        run: sudo fc-cache -v
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/checkout@v3
       - name: Build
         run: cargo build --locked
 

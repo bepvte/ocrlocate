@@ -65,7 +65,7 @@ mod tests {
         let result = Command::new("convert")
             .args(
                 concat!(
-                    "-background lightblue -fill white ",
+                    "-background lightblue -fill white -font Liberation-Sans ",
                     "-size 300x70 -pointsize 24 -gravity east ",
                     "label:haystackhayneedle"
                 )
