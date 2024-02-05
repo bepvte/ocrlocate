@@ -121,7 +121,7 @@ fn public_types_bindings(clang_extra_include: &[String]) -> String {
         .replace("tesseract_k", "k")
 }
 
-#[cfg(all(feature = "bundled", target_os = "linux"))]
+#[cfg(all(feature = "bundled"))]
 fn find_tesseract_system_lib() -> Vec<String> {
     use cmake::Config;
     use std::process::Command;
@@ -163,8 +163,12 @@ fn find_tesseract_system_lib() -> Vec<String> {
         panic!("failed to unarchive tesseract");
     }
 
-    let dst = Config::new(out_dir.join(format!("tesseract-{TESSERACT_VER}")))
-        .define("TESSDATA_PREFIX", find_tessdata_path())
+    let src_dir = out_dir
+        .join(format!("tesseract-{TESSERACT_VER}"))
+        .to_owned();
+
+    let mut cm = Config::new(&src_dir);
+    cm.define("TESSDATA_PREFIX", find_tessdata_path())
         .define(
             "ENABLE_LTO",
             if cfg!(not(debug_assertions)) {
@@ -173,7 +177,6 @@ fn find_tesseract_system_lib() -> Vec<String> {
                 "OFF"
             },
         )
-        .define("ENABLE_NATIVE", "ON")
         .define("DISABLE_LEGACY_ENGINE", "ON")
         .define("BUILD_TRAINING_TOOLS", "OFF")
         .define("BUILD_SHARED_LIBS", "OFF")
@@ -181,9 +184,20 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .define("GRAPHICS_DISABLE", "ON")
         .define("DISABLE_ARCHIVE", "ON")
         .define("DISABLE_CURL", "ON")
+        // this flag disables tesseract recompressing every image as a png
+        // no idea why anyone would do that
         .cflag("-DTESSERACT_IMAGEDATA_AS_PIX")
-        .cxxflag("-DTESSERACT_IMAGEDATA_AS_PIX")
-        .build();
+        .cxxflag("-DTESSERACT_IMAGEDATA_AS_PIX");
+
+    if env::var("CI").is_err()
+        && env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|x| x.contains("target-cpu=native"))
+    {
+        cm.define("ENABLE_NATIVE", "ON");
+    } else {
+        println!("cargo:warning=disabling native architecture optimizaton, put -Ctarget-cpu=native in rustflags to enable it");
+    }
+
+    let dst = cm.build();
 
     println!(
         "cargo:rustc-link-search=native={}",
@@ -192,7 +206,11 @@ fn find_tesseract_system_lib() -> Vec<String> {
     println!("cargo:rustc-link-lib=static=tesseract");
     println!("cargo:rustc-link-lib=stdc++");
 
-    vec![dst.join("include").into_os_string().into_string().unwrap()]
+    vec![src_dir
+        .join("include")
+        .into_os_string()
+        .into_string()
+        .unwrap()]
 }
 
 #[allow(dead_code)]
@@ -203,8 +221,9 @@ fn find_tessdata_path() -> String {
     }
     for p in [
         "/usr/share/tessdata",
-        "/usr/share/tesseract-ocr/4.00/tessdata",
         "/usr/share/tesseract/tessdata",
+        "/usr/share/tesseract-ocr/4.00/tessdata",
+        "/usr/share/tesseract-ocr/5.00/tessdata",
         "/usr/share/tesseract-ocr/4/tessdata",
         "/usr/share/tesseract-ocr/5/tessdata",
     ] {

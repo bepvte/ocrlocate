@@ -1,22 +1,21 @@
-name: Rust
+name: Build test
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install dependencies
-      run: sudo apt-get install -y libtesseract-dev
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
+      - name: Install dependencies
+        run: sudo apt-get install -y libtesseract-dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --locked
