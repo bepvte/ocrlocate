@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        run: sudo apt-get install -y libtesseract-dev
+        run: sudo apt-get install --no-install-recommends -y libtesseract-dev imagemagick
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -19,3 +19,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: cargo build --locked
+
+      - name: Test
+        run: cargo test
