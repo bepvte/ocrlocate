@@ -150,7 +150,7 @@ fn cli() -> Command {
                     "Tesseract language identifier. Language package must be installed (such as tesseract-ocr-eng). Only affects
 indexing of new images, so its recommended to delete the database when changed.",
                 ),
-            arg!(index: -i --"no-index" "Do not index the directory before searching, only search an existing index").action(ArgAction::SetFalse),
+            arg!(index: -n --"no-index" "Do not index the directory before searching, only search an existing index").action(ArgAction::SetFalse),
             arg!(-r --rescan "When indexing, ignore file modified time and force rescan"),
             arg!(-t --threads <THREADS> "Set threads").value_parser(value_parser!(usize)),
             arg!(-x --exclude <PATTERN> ... "Exclude directories and paths matching this pattern").long_help(
@@ -160,7 +160,7 @@ Matched directories will not be descended into.  Excluded items will be removed 
             arg!(-m --"max-size" <RES> "Ignore images that are larger then [width]x[height]"),
             arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("subdirs"),
             arg!(-v --verbose "Print debug messages"),
-            arg!(-n --limit "Max amount of results").value_parser(value_parser!(usize)).default_value("100"),
+            arg!(-l --limit "Max amount of results").value_parser(value_parser!(usize)).default_value("100"),
             arg!(subdirs: --"no-subdirs" "Do not recurse into subdirectories")
                 .action(ArgAction::SetFalse),
             // maybe something for symlinks
