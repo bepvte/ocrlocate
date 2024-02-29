@@ -19,7 +19,8 @@ Options:
           [default: /home/bep/.local/share/ocrlocate/index.db]
 
       --lang <LANG>
-          Tesseract language identifier. Language package must be installed (such as tesseract-ocr-eng). Only affects
+          Tesseract language identifier. Language package must be installed (such as
+          tesseract-ocr-eng). Only affects
           indexing of new images, so its recommended to delete the database when changed.
 
           [default: eng]
@@ -34,9 +35,10 @@ Options:
           Set threads
 
   -x, --exclude <PATTERN>
-          Exclude directories and paths matching a `glob` pattern: https://docs.rs/glob/latest/glob/struct.Pattern.html
-          Matched directories will not be descended into.  Excluded items will be removed from the index if --cleanup is
-          specified.
+          Exclude directories and paths matching a `glob` pattern:
+          https://docs.rs/glob/latest/glob/struct.Pattern.html
+          Matched directories will not be descended into.  Excluded items will be removed from the
+          index if --cleanup is specified.
 
   -m, --max-size <RES>
           Ignore images that are larger then [width]x[height]
@@ -54,9 +56,10 @@ Options:
           Do not recurse into subdirectories
 
   -s, --search-type <TYPE>
-          Type of query to search. Default is to search for any instance of a literal value (`simple`)
-          `simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `ocrlocate one two` matches
-          "needleone twoneedle"
+          Type of query to search. Default is to search for any instance of a literal value
+          (`simple`)
+          `simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `ocrlocate
+          one two` matches "needleone twoneedle"
           `match`: Passes sqlite fts5 the argument as an unescaped match query:
           https://www.sqlite.org/fts5.html#full_text_query_syntax.
               Note that all queries are prefix queries with the tokenizer we use.
