@@ -144,7 +144,7 @@ fn cli() -> Command {
                 .value_parser(value_parser!(PathBuf))
                 .env("OCRLOCATE_DB")
                 .default_value(DBPATH.get().unwrap().as_os_str()),
-            arg!(-l --lang <LANG> "Tesseract language code")
+            arg!(--lang <LANG> "Tesseract language code")
                 .default_value("eng")
                 .long_help(
                     "Tesseract language identifier. Language package must be installed (such as tesseract-ocr-eng). Only affects
