@@ -4,7 +4,6 @@ use std::{env, iter};
 use anyhow::Result;
 use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 use glob::Pattern;
-use image::io::Reader as ImageReader;
 use itertools::{Either, Itertools};
 use kdam::{BarBuilder, BarExt};
 use rayon::prelude::*;
@@ -22,7 +21,7 @@ pub struct IndexOptions {
     pub subdirs: bool,
     pub chunksize: usize,
     pub cleanup: bool,
-    pub max_dimensions: Option<(u32, u32)>,
+    pub max_dimensions: Option<(usize, usize)>,
 }
 
 pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> {
@@ -106,32 +105,23 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
                     return false;
                 }
                 if let Some((max_width, max_height)) = options.max_dimensions {
-                    let img = ImageReader::open(&p.0).and_then(|img| img.with_guessed_format());
+                    let img = imagesize::size(&p.0);
                     match img {
                         Err(_) => {
                             eprintln!("Failed to read image to check dimensions: {}", p.0);
                             return false;
                         }
-                        Ok(img) => match img.into_dimensions() {
-                            Err(e) => {
-                                eprintln!(
-                                    "Failed to decode image dimensions: {} Skipping: {}",
-                                    e, p.0
-                                );
+                        Ok(size) => {
+                            if size.width > max_width || size.height > max_height {
+                                if options.debug {
+                                    eprintln!(
+                                        "skipping image: {} with dimensions {}x{}",
+                                        p.0, size.width, size.height
+                                    );
+                                }
                                 return false;
                             }
-                            Ok((width, height)) => {
-                                if width > max_width || height > max_height {
-                                    if options.debug {
-                                        eprintln!(
-                                            "skipping image: {} with dimensions {}x{}",
-                                            p.0, width, height
-                                        );
-                                    }
-                                    return false;
-                                }
-                            }
-                        },
+                        }
                     };
                 }
                 true
@@ -167,7 +157,7 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
 
         let count = db.save_results(results)?;
         if options.debug {
-            eprintln!("Saved {count} to the db");
+            eprintln!("{count} rows modified");
         }
     }
 

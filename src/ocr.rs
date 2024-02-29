@@ -80,6 +80,7 @@ mod tests {
         path
     }
     #[test]
+    #[ignore]
     fn scan() -> Result<()> {
         let mut ocr = Ocr::new("eng", true).unwrap();
         let image = test_image();

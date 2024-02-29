@@ -5,6 +5,15 @@ use std::time::UNIX_EPOCH;
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SearchType {
+    Simple,
+    Match,
+    Glob,
+    #[cfg(feature = "regex")]
+    Regex,
+}
+
 pub struct DB {
     conn: Connection,
 }
@@ -19,6 +28,9 @@ impl DB {
         conn.pragma_update(None, "journal_mode", "wal").unwrap();
         conn.pragma_update(None, "synchronous", "normal").unwrap(); // TODO: maybe not
 
+        #[cfg(feature = "regex")]
+        register_regex(&conn).unwrap();
+
         let user_version: i32 = conn
             .query_row("SELECT user_version FROM pragma_user_version", [], |row| {
                 row.get(0)
@@ -28,7 +40,11 @@ impl DB {
         let db = DB { conn };
         match user_version {
             0 => db.init_db()?,
-            1 => (),
+            1 => panic!(
+                "Your database is from a prerelease version and should be deleted, its at {}",
+                path
+            ),
+            2 => (),
             x => panic!("Database schema version is too high: {x}"),
         };
 
@@ -45,11 +61,23 @@ impl DB {
                 id INTEGER PRIMARY KEY ASC,
                 path TEXT UNIQUE NOT NULL,
                 modtime INTEGER NOT NULL,
-                mark_delete BOOL DEFAULT FALSE
+                mark_delete BOOL DEFAULT FALSE,
+                content TEXT NOT NULL
             );
             CREATE INDEX mark_delete_idx ON images (mark_delete);
-            CREATE VIRTUAL TABLE images_fts USING fts5(result, tokenize='trigram case_sensitive 1');
-            PRAGMA user_version = 1;
+            -- we use external-content fts because otherwise I got strange consistency errors
+            CREATE VIRTUAL TABLE images_fts USING fts5(content, content=images, content_rowid=id, tokenize='trigram case_sensitive 0');
+            CREATE TRIGGER images_insert AFTER INSERT ON images BEGIN
+                INSERT INTO images_fts (rowid, content) VALUES (new.id, new.content);
+            END;
+            CREATE TRIGGER images_delete AFTER DELETE ON images BEGIN
+                INSERT INTO images_fts (images_fts, rowid, content) VALUES ('delete', old.id, old.content);
+            END;
+            CREATE TRIGGER images_update AFTER UPDATE ON images BEGIN
+                INSERT INTO images_fts (images_fts, rowid, content) VALUES ('delete', old.id, old.content);
+                INSERT INTO images_fts (rowid, content) VALUES (new.id, new.content);
+            END;
+            PRAGMA user_version = 2;
             COMMIT;
             "#,
         )
@@ -82,33 +110,19 @@ impl DB {
         let tx = self.conn.transaction().unwrap();
 
         let rowchanges: usize = {
-            let mut metadata_stmt = tx
-                .prepare_cached("INSERT INTO images (path, modtime) VALUES (?1, ?2) RETURNING id")
+            let mut index_stmt = tx
+                .prepare_cached("INSERT INTO images (path, modtime, content) VALUES (?1, ?2, ?3) ON CONFLICT(path) DO UPDATE SET modtime=excluded.modtime, content=excluded.content")
                 .unwrap();
-            let mut fts_stmt = tx
-                .prepare_cached("INSERT INTO images_fts (rowid, result) VALUES (?1, ?2)")
-                .unwrap();
-
             results
                 .into_iter()
                 .map(|res| {
-                    let rowid = metadata_stmt
-                        .query_row(
-                            (res.path.as_str(), metadata_to_seconds(&res.metadata)),
-                            |row| row.get::<_, i64>(0),
-                        )
-                        .with_context(|| format!("failed to insert metadata: {}", res.path))
-                        .unwrap();
-                    (rowid, res.contents)
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(|(id, contents)| {
-                    fts_stmt
-                        .execute((id, &contents))
-                        .with_context(|| {
-                            format!("failed to index ocr result: {:?}", (id, &contents))
-                        })
+                    index_stmt
+                        .execute((
+                            res.path.as_str(),
+                            metadata_to_seconds(&res.metadata),
+                            res.contents,
+                        ))
+                        .with_context(|| format!("failed to insert image: {}", res.path))
                         .unwrap()
                 })
                 .sum()
@@ -161,19 +175,28 @@ impl DB {
         queries: Vec<&str>,
         path: &Path,
         limit: usize,
+        kind: SearchType,
     ) -> Result<Vec<SearchResult>> {
-        let query = format!(r#""{}""#, queries.join(" ").escape_default()); // TODO: support complex queries
+        let query = if kind == SearchType::Simple {
+            format!(r#""{}""#, queries.join(" ").replace('*', "\\*"))
+        } else {
+            queries.join(" ")
+        };
 
         let mut stmt = self
             .conn
             .prepare_cached(
-                r#"
+                &format!(r#"
                 SELECT snippet(images_fts, -1, '[', ']', '..', 64), images.path, images.modtime
                     FROM images_fts
                     INNER JOIN images ON images_fts.rowid = images.id AND images.path LIKE ?2 ESCAPE '#'
-                    WHERE images_fts.result MATCH ?1 ORDER BY RANK, images.modtime DESC
+                    WHERE images_fts.content {} ?1 ORDER BY RANK, images.modtime DESC
                     LIMIT ?3;
-                "#,
+                "#, match kind {
+                    SearchType::Simple | SearchType::Match => "MATCH",
+                    SearchType::Glob => "GLOB",
+                    SearchType::Regex => "REGEXP"
+                }),
             )
             .unwrap();
         let results = stmt
@@ -217,6 +240,34 @@ fn path_to_like(s: &Path) -> String {
         "{}%",
         s.replace('#', "##").replace('%', "#%").replace('_', "#_")
     )
+}
+
+#[cfg(feature = "regex")]
+fn register_regex(db: &Connection) -> Result<()> {
+    use regex::Regex;
+    use rusqlite::functions::FunctionFlags;
+    use std::sync::Arc;
+    db.create_scalar_function(
+        "regexp",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            assert_eq!(ctx.len(), 2, "called with unexpected number of arguments");
+            let regexp: Arc<Regex> =
+                ctx.get_or_create_aux(0, |vr| -> Result<_> { Ok(Regex::new(vr.as_str()?)?) })?;
+            let is_match = {
+                let text = ctx
+                    .get_raw(1)
+                    .as_str()
+                    .map_err(|e| rusqlite::Error::UserFunctionError(e.into()))?;
+
+                regexp.is_match(text)
+            };
+
+            Ok(is_match)
+        },
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -294,7 +345,7 @@ mod tests {
             ])?,
             3
         );
-        let results = db.search(vec!["needle"], Path::new("/"), 40)?;
+        let results = db.search(vec!["needle"], Path::new("/"), 40, SearchType::Simple)?;
         println!("{:?}", results);
         assert_eq!(results.len(), 2);
 

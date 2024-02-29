@@ -7,11 +7,12 @@ use std::{env, fs};
 
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf as PathBuf;
+use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{arg, crate_description, crate_version, value_parser, ArgAction, Command};
 use glob::Pattern;
 use itertools::Itertools;
 
-use crate::db::DB;
+use crate::db::{SearchType, DB};
 use crate::ocr::Ocr;
 
 // reading those images eats so much memory
@@ -106,6 +107,7 @@ fn main() -> Result<()> {
             queries.map(|x| x.as_ref()).collect(),
             &PathBuf::try_from(env::current_dir().unwrap()).unwrap(),
             *matches.get_one::<usize>("limit").unwrap(),
+            *matches.get_one::<SearchType>("search-type").unwrap(),
         )?;
         if cfg!(debug_assertions) && debug {
             println!("{:#?}", results)
@@ -149,7 +151,7 @@ fn cli() -> Command {
 indexing of new images, so its recommended to delete the database when changed.",
                 ),
             arg!(index: -i --"no-index" "Do not index the directory before searching, only search an existing index").action(ArgAction::SetFalse),
-            arg!(-r --"rescan" "Ignore file modified time and force rescan"),
+            arg!(-r --rescan "When indexing, ignore file modified time and force rescan"),
             arg!(-t --threads <THREADS> "Set threads").value_parser(value_parser!(usize)),
             arg!(-x --exclude <PATTERN> ... "Exclude directories and paths matching this pattern").long_help(
                 "Exclude directories and paths matching a `glob` pattern: https://docs.rs/glob/latest/glob/struct.Pattern.html
@@ -162,15 +164,38 @@ Matched directories will not be descended into.  Excluded items will be removed 
             arg!(subdirs: --"no-subdirs" "Do not recurse into subdirectories")
                 .action(ArgAction::SetFalse),
             // maybe something for symlinks
-            arg!(--pwd <PWD> "Set pwd"),
-            arg!(--"scan-limit" <LIMIT> "Set limit")
+            arg!(-s --"search-type" <TYPE> "Type of search query passed to the search index").default_value("simple").long_help(
+                r#"Type of query to search. Default is to search for any instance of a literal value (`simple`)
+`simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `ocrlocate one two` matches "needleone twoneedle"
+`match`: Passes sqlite fts5 the argument as an unescaped match query: https://www.sqlite.org/fts5.html#full_text_query_syntax.
+    Note that all queries are prefix queries with the tokenizer we use.
+    Examples: `ocrlocate -s match one AND '"AND"'`
+              `ocrlocate -s match needle NOT dontfind`
+`glob`: Passes sqlite fts5 the argument as a glob query, which supports [a-z], *, and ?
+    You will likely want to surround your query with *, due to the nature of OCR results
+    The syntax is documented in here: https://sqlite.org/src/artifact?name=4204c561&ln=698
+    To escape characters, include them in a set: [*], [[]
+`regex`: Runs the regular expression on every row instead of using the index
+    Uses the rust regex syntax https://docs.rs/regex/latest/regex/index.html#syntax"#
+            ).value_parser(PossibleValuesParser::new(["simple", "match", "glob", "regex"]).map(|x| -> SearchType {
+                match x.to_ascii_lowercase().as_str() {
+                    "simple" => SearchType::Simple,
+                    "match" => SearchType::Match,
+                    "glob" => SearchType::Glob,
+                    #[cfg(feature = "regex")] "regex" => SearchType::Regex,
+                    #[cfg(not(feature = "regex"))] "regex" => panic!("This build was not compiled with regex support"),
+                    _ => unreachable!()
+                }
+            })),
+            arg!(--pwd <PWD> "Set pwd").hide(true),
+            arg!(--"scan-limit" <LIMIT> "Set max amount of scanned files")
                 .hide(true)
                 .value_parser(value_parser!(usize)),
             arg!(--"chunk-size" <SIZE> "Set chunk size")
                 .hide(true)
                 .value_parser(value_parser!(usize))
                 .default_value("900"),
-            arg!(--"dump-scan" "Dump an OCR result and exit").hide(true),
-            arg!(<QUERIES> ... "Strings to search for")
+            arg!(--"dump-scan" "Dump the OCR result of one file and exit"),
+            arg!(<QUERIES> ... "Strings to search for"),
         ])
 }
