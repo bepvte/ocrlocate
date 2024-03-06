@@ -140,7 +140,7 @@ fn cli() -> Command {
         .version(crate_version!())
         .about(crate_description!())
         .args([
-            arg!(-d --database <FILE> "Location of the index databse")
+            arg!(-d --database <FILE> "Location of the index database")
                 .value_parser(value_parser!(PathBuf))
                 .env("OCRLOCATE_DB")
                 .default_value(DBPATH.get().unwrap().as_os_str()),
@@ -160,7 +160,7 @@ Matched directories will not be descended into.  Excluded items will be removed 
             arg!(-m --"max-size" <RES> "Ignore images that are larger then [width]x[height]"),
             arg!(-c --cleanup "Delete files that no longer exist in the current directory from the index").conflicts_with("subdirs"),
             arg!(-v --verbose "Print debug messages"),
-            arg!(-l --limit "Max amount of results").value_parser(value_parser!(usize)).default_value("100"),
+            arg!(-l --limit <LIMIT> "Max amount of results").value_parser(value_parser!(usize)).default_value("100"),
             arg!(subdirs: --"no-subdirs" "Do not recurse into subdirectories")
                 .action(ArgAction::SetFalse),
             // maybe something for symlinks

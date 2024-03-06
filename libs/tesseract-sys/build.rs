@@ -49,7 +49,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
 // we can use tesseract installed anywhere on Linux.
 // if you change install path(--prefix) to `configure` script.
 // set `export PKG_CONFIG_PATH=/path-to-lib/pkgconfig` before.
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "android"))]
 #[cfg(not(feature = "bundled"))]
 fn find_tesseract_system_lib() -> Vec<String> {
     let pk = pkg_config::Config::new()
@@ -72,12 +72,6 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .map(|x| x.to_string_lossy())
         .map(|x| x.to_string())
         .collect::<Vec<String>>()
-}
-
-#[cfg(all(not(windows), not(target_os = "macos"), not(target_os = "linux")))]
-fn find_tesseract_system_lib() -> Vec<String> {
-    println!("cargo:rustc-link-lib=tesseract");
-    vec![]
 }
 
 fn capi_bindings(clang_extra_include: &[String]) -> bindgen::Bindings {

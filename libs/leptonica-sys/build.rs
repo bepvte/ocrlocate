@@ -50,7 +50,12 @@ fn find_leptonica_system_lib() -> Option<String> {
 // we can use leptonica installed anywhere on Linux.
 // if you change install path(--prefix) to `configure` script.
 // set `export PKG_CONFIG_PATH=/path-to-lib/pkgconfig` before.
-#[cfg(any(target_os = "macos", target_os = "linux", target_os = "freebsd"))]
+#[cfg(any(
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "android"
+))]
 fn find_leptonica_system_lib() -> Option<String> {
     let pk = pkg_config::Config::new().probe("lept").unwrap();
     // Tell cargo to tell rustc to link the system proj shared library.
@@ -62,17 +67,6 @@ fn find_leptonica_system_lib() -> Option<String> {
         include_path.pop();
     }
     Some(include_path.to_str().unwrap().into())
-}
-
-#[cfg(all(
-    not(windows),
-    not(target_os = "macos"),
-    not(target_os = "linux"),
-    not(target_os = "freebsd")
-))]
-fn find_leptonica_system_lib() -> Option<String> {
-    println!("cargo:rustc-link-lib=lept");
-    None
 }
 
 fn main() {
