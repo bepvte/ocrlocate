@@ -13,7 +13,7 @@ use glob::Pattern;
 use itertools::Itertools;
 
 use crate::db::{SearchType, DB};
-use crate::ocr::Ocr;
+use crate::ocr::{Binarization, Ocr};
 
 // reading those images eats so much memory
 #[cfg(not(target_env = "msvc"))]
@@ -29,7 +29,13 @@ fn main() -> Result<()> {
     let matches = cli().get_matches();
 
     if matches.get_flag("dump-scan") {
-        let mut o = Ocr::new(matches.get_one::<String>("lang").unwrap(), true)?;
+        let mut o = Ocr::new(
+            matches.get_one::<String>("lang").unwrap(),
+            true,
+            matches.get_one::<f32>("scale").copied(),
+            matches.get_one::<Binarization>("binarization").copied(),
+            matches.get_one::<i64>("psm").copied(),
+        )?;
         let path = PathBuf::from(
             matches
                 .get_one::<String>("QUERIES")
@@ -97,6 +103,9 @@ fn main() -> Result<()> {
                 chunksize: *matches.get_one::<usize>("chunk-size").unwrap(),
                 cleanup: matches.get_flag("cleanup"),
                 max_dimensions: max_size,
+                scale: matches.get_one::<f32>("scale").copied(),
+                binarization: matches.get_one::<Binarization>("binarization").copied(),
+                psm: matches.get_one::<i64>("psm").copied(),
             },
         )?;
     }
@@ -168,6 +177,7 @@ Matched directories will not be descended into.  Excluded items will be removed 
                 r#"Type of query to search. Default is to search for any instance of a literal value (`simple`)
 `simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `ocrlocate one two` matches "needleone twoneedle"
 `match`: Passes sqlite fts5 the argument as an unescaped match query: https://www.sqlite.org/fts5.html#full_text_query_syntax.
+    This is most useful if you are looking for a result that matches several terms anywhere, not just one long term
     Note that all queries are prefix queries with the tokenizer we use.
     Examples: `ocrlocate -s match one AND '"AND"'`
               `ocrlocate -s match needle NOT dontfind`
@@ -187,6 +197,20 @@ Matched directories will not be descended into.  Excluded items will be removed 
                     _ => unreachable!()
                 }
             })),
+            arg!(--binarization <METHOD> "Which leptonica thresholding method to use")
+                .value_parser(PossibleValuesParser::new(["Otsu", "LeptonicaOtsu", "Sauvola"]).map(|x| -> Binarization {
+                    match x.as_str() {
+                        "Otsu" => Binarization::Otsu,
+                        "LeptonicaOtsu" => Binarization::LeptonicaOtsu,
+                        "Sauvola" => Binarization::Sauvola,
+                        _ => unreachable!()
+                    }
+                })),
+            arg!(--psm <PSM> "Page segmentation mode").long_help(r#"Page segmentation mode
+Documentation of values here: https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html#page-segmentation-method"#
+            ).value_parser(value_parser!(i64).range(0..=13)).default_value("11"),
+            // TODO: scale by max size, scale to res, etc
+            arg!(--scale <FRAC> "Fraction to scale all images down by before applying ocr").value_parser(value_parser!(f32)),
             arg!(--pwd <PWD> "Set pwd").hide(true),
             arg!(--"scan-limit" <LIMIT> "Set max amount of scanned files")
                 .hide(true)

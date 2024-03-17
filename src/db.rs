@@ -195,6 +195,7 @@ impl DB {
                 "#, match kind {
                     SearchType::Simple | SearchType::Match => "MATCH",
                     SearchType::Glob => "GLOB",
+                    #[cfg(feature="regex")]
                     SearchType::Regex => "REGEXP"
                 }),
             )

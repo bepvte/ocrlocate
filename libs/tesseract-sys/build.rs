@@ -120,11 +120,13 @@ fn find_tesseract_system_lib() -> Vec<String> {
     use cmake::Config;
     use std::process::Command;
 
-    const TESSERACT_VER: &str = "5.3.4";
+    let tesseract_ver = "2b07505e0e86026ae7c10767b334c337ccf06576";
+    let tesseract_url =
+        format!("https://github.com/tesseract-ocr/tesseract/archive/{tesseract_ver}.tar.gz");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let tess_tgz = out_dir
-        .join(format!("tesseract-{}.tar.gz", TESSERACT_VER))
+        .join(format!("tesseract-{}.tar.gz", tesseract_ver))
         .into_os_string()
         .into_string()
         .unwrap();
@@ -133,12 +135,10 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .current_dir(&out_dir)
         .args([
             "-z",
-            &format!("tesseract-{TESSERACT_VER}.tar.gz"),
+            &tess_tgz,
             "-RsSfL",
             "--tlsv1.2",
-            &format!(
-                "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/{TESSERACT_VER}.tar.gz"
-            ),
+            &tesseract_url,
             "-o",
             &tess_tgz,
         ])
@@ -158,7 +158,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
     }
 
     let src_dir = out_dir
-        .join(format!("tesseract-{TESSERACT_VER}"))
+        .join(format!("tesseract-{tesseract_ver}"))
         .to_owned();
 
     let mut cm = Config::new(&src_dir);
@@ -171,11 +171,11 @@ fn find_tesseract_system_lib() -> Vec<String> {
                 "OFF"
             },
         )
-        .define("DISABLE_LEGACY_ENGINE", "ON")
+        .define("DISABLED_LEGACY_ENGINE", "ON")
         .define("BUILD_TRAINING_TOOLS", "OFF")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("OPENMP_BUILD", "OFF")
-        .define("GRAPHICS_DISABLE", "ON")
+        .define("GRAPHICS_DISABLED", "ON")
         .define("DISABLE_ARCHIVE", "ON")
         .define("DISABLE_CURL", "ON")
         // this flag disables tesseract recompressing every image as a png

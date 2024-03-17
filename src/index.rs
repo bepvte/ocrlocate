@@ -10,6 +10,7 @@ use rayon::prelude::*;
 use walkdir::WalkDir;
 
 use crate::db::OcrResult;
+use crate::ocr;
 use crate::{db::DB, ocr::Ocr};
 
 pub struct IndexOptions {
@@ -22,6 +23,9 @@ pub struct IndexOptions {
     pub chunksize: usize,
     pub cleanup: bool,
     pub max_dimensions: Option<(usize, usize)>,
+    pub scale: Option<f32>,
+    pub binarization: Option<ocr::Binarization>,
+    pub psm: Option<i64>,
 }
 
 pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> {
@@ -132,7 +136,16 @@ pub fn index_dir(db: &mut DB, path: &Path, options: IndexOptions) -> Result<()> 
         let results: Vec<OcrResult> = chunk
             .par_iter()
             .map_init(
-                || Ocr::new(&options.lang, options.debug).unwrap(),
+                || {
+                    Ocr::new(
+                        &options.lang,
+                        options.debug,
+                        options.scale,
+                        options.binarization,
+                        options.psm,
+                    )
+                    .unwrap()
+                },
                 move |ocr, ele| {
                     if options.debug {
                         eprintln!("now working on {}", &ele.0);

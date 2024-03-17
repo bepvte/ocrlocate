@@ -8,10 +8,24 @@ use leptonica_plumbing::{self, leptonica_sys};
 #[derive(Debug)]
 pub struct Ocr {
     leptess: TessApi,
+    scale: Option<f32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Binarization {
+    Otsu = 0,
+    LeptonicaOtsu = 1,
+    Sauvola = 2,
 }
 
 impl Ocr {
-    pub fn new(lang: &str, debug: bool) -> Result<Self> {
+    pub fn new(
+        lang: &str,
+        debug: bool,
+        scale: Option<f32>,
+        binarization: Option<Binarization>,
+        psm: Option<i64>,
+    ) -> Result<Self> {
         if lang.len() != 3 || lang.contains(['.', '/', '\\']) || !lang.is_ascii() {
             return Err(anyhow!("Invalid language code: {:?}", lang));
         }
@@ -28,21 +42,53 @@ impl Ocr {
                 .unwrap();
             set_log_level(leptonica_sys::L_SEVERITY_ERROR);
         }
+        if let Some(binarization) = binarization {
+            leptess
+                .raw
+                .set_variable(
+                    &CString::new("thresholding_method").unwrap(),
+                    &CString::new((binarization as u8).to_string()).unwrap(),
+                )
+                .unwrap();
+        }
+        if let Some(psm) = psm {
+            leptess.raw.set_page_seg_mode(psm.try_into().unwrap());
+        }
 
-        Ok(Ocr { leptess })
+        leptess
+            .raw
+            .set_variable(
+                leptess::Variable::TesseditPagesegMode.as_cstr(),
+                &CString::new("11").unwrap(),
+            )
+            .unwrap();
+
+        leptess
+            .raw
+            .set_variable(
+                leptess::Variable::TesseditCharBlacklist.as_cstr(),
+                &CString::new("|®»«®©").unwrap(),
+            )
+            .unwrap();
+
+        Ok(Ocr { leptess, scale })
     }
     pub fn scan(&mut self, img: &Path) -> Result<String> {
         let filename = CString::new(img.as_str()).expect("null in filename");
-        let cpix = leptonica_plumbing::Pix::read_with_hint(
+        let mut cpix = leptonica_plumbing::Pix::read_with_hint(
             &filename,
             leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA,
         )?;
+
+        if let Some(scale) = self.scale {
+            cpix.scale_general(scale, scale)?;
+        }
 
         self.leptess.set_image(&leptess::leptonica::Pix {
             raw: cpix.to_ref_counted(),
         });
 
-        Ok(self.leptess.get_utf8_text()?)
+        Ok(self.leptess.get_utf8_text()?.replace("\n\n", "\n"))
     }
 }
 
@@ -82,7 +128,7 @@ mod tests {
     #[test]
     #[ignore]
     fn scan() -> Result<()> {
-        let mut ocr = Ocr::new("eng", true).unwrap();
+        let mut ocr = Ocr::new("eng", true, None, None, Some(11)).unwrap();
         let image = test_image();
         let result = ocr.scan(Path::from_path(&image).unwrap()).unwrap();
         assert!(result.contains("needle"));
