@@ -16,10 +16,10 @@ bundled = ["cmake"]
 default = []
 
 [dependencies]
-leptonica-sys = { version = "~0.4", path = "../leptonica-sys" }
+leptonica-sys = "~0.4"
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = "~0.69"
 cmake = { version = "0.1.50", optional = true }
 [target.'cfg(windows)'.build-dependencies]
 vcpkg = "0.2.8"

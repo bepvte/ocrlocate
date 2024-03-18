@@ -10,8 +10,8 @@ readme = "README.md"
 keywords = ["leptonica", "tesseract", "ocr", "image"]
 license = "MIT"
 [dependencies]
-tesseract-sys = { version = "~0.6.2", path = "../tesseract-sys" }
-leptonica-plumbing = { version = "1.0", path = "../leptonica-plumbing" }
+tesseract-sys = "~0.6.2"
+leptonica-plumbing = "1.0"
 thiserror = "1.0"
 
 [dev-dependencies]
