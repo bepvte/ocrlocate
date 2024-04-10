@@ -34,7 +34,7 @@ regex = { version = "1.10.3", optional = true }
 tikv-jemallocator = { version = "0.5.4", features = ["unprefixed_malloc_on_supported_platforms"] }
 
 [workspace]
-members = ["libs/*"]
+members = [".", "libs/*"]
 
 [patch.crates-io]
 leptess = { path = "./libs/leptess" }

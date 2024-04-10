@@ -117,6 +117,7 @@ fn main() -> Result<()> {
             &PathBuf::try_from(env::current_dir().unwrap()).unwrap(),
             *matches.get_one::<usize>("limit").unwrap(),
             *matches.get_one::<SearchType>("search-type").unwrap(),
+            matches.get_one::<String>("exclude").map(|x| x.as_str()),
         )?;
         if cfg!(debug_assertions) && debug {
             println!("{:#?}", results)

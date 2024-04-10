@@ -3,7 +3,7 @@ use std::fs;
 use std::time::UNIX_EPOCH;
 
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, ToSql};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SearchType {
@@ -30,6 +30,7 @@ impl DB {
 
         #[cfg(feature = "regex")]
         register_regex(&conn).unwrap();
+        register_glob(&conn).unwrap();
 
         let user_version: i32 = conn
             .query_row("SELECT user_version FROM pragma_user_version", [], |row| {
@@ -176,6 +177,7 @@ impl DB {
         path: &Path,
         limit: usize,
         kind: SearchType,
+        exclude_glob: Option<&str>,
     ) -> Result<Vec<SearchResult>> {
         let query = if kind == SearchType::Simple {
             format!(r#""{}""#, queries.join(" ").replace('*', "\\*"))
@@ -190,18 +192,28 @@ impl DB {
                 SELECT snippet(images_fts, -1, '[', ']', '..', 64), images.path, images.modtime
                     FROM images_fts
                     INNER JOIN images ON images_fts.rowid = images.id AND images.path LIKE ?2 ESCAPE '#'
-                    WHERE images_fts.content {} ?1 ORDER BY RANK, images.modtime DESC
+                    WHERE images_fts.content {kind} ?1 {exclude}
+                    ORDER BY RANK, images.modtime DESC
                     LIMIT ?3;
-                "#, match kind {
+                "#, kind=match kind {
                     SearchType::Simple | SearchType::Match => "MATCH",
                     SearchType::Glob => "GLOB",
                     #[cfg(feature="regex")]
                     SearchType::Regex => "REGEXP"
-                }),
+                }, exclude=if exclude_glob.is_some() {"AND NOT rust_glob(?4||'/**', images.path)"} else {""}),
             )
             .unwrap();
+        let fixed_path = path_to_like(path);
+        let mut params = vec![
+            &query as &dyn ToSql,
+            &fixed_path as &dyn ToSql,
+            &limit as &dyn ToSql,
+        ];
+        if exclude_glob.is_some() {
+            params.push(&exclude_glob as &dyn ToSql);
+        }
         let results = stmt
-            .query_and_then(params![query, path_to_like(path), limit], |row| {
+            .query_and_then(params.as_slice(), |row| {
                 Ok(SearchResult {
                     contents: row.get(0)?,
                     path: row.get(1)?,
@@ -263,6 +275,33 @@ fn register_regex(db: &Connection) -> Result<()> {
                     .map_err(|e| rusqlite::Error::UserFunctionError(e.into()))?;
 
                 regexp.is_match(text)
+            };
+
+            Ok(is_match)
+        },
+    )?;
+    Ok(())
+}
+
+fn register_glob(db: &Connection) -> Result<()> {
+    use glob::Pattern;
+    use rusqlite::functions::FunctionFlags;
+    use std::sync::Arc;
+    db.create_scalar_function(
+        "rust_glob",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        move |ctx| {
+            assert_eq!(ctx.len(), 2, "called with unexpected number of arguments");
+            let pattern: Arc<Pattern> =
+                ctx.get_or_create_aux(0, |vr| -> Result<_> { Ok(Pattern::new(vr.as_str()?)?) })?;
+            let is_match = {
+                let text = ctx
+                    .get_raw(1)
+                    .as_str()
+                    .map_err(|e| rusqlite::Error::UserFunctionError(e.into()))?;
+
+                pattern.matches(text)
             };
 
             Ok(is_match)
@@ -346,7 +385,7 @@ mod tests {
             ])?,
             3
         );
-        let results = db.search(vec!["needle"], Path::new("/"), 40, SearchType::Simple)?;
+        let results = db.search(vec!["needle"], Path::new("/"), 40, SearchType::Simple, None)?;
         println!("{:?}", results);
         assert_eq!(results.len(), 2);
 
