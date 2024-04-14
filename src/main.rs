@@ -176,10 +176,10 @@ Matched directories will not be descended into.  Excluded items will be removed 
             // maybe something for symlinks
             arg!(-s --"search-type" <TYPE> "Type of search query passed to the search index").default_value("simple").long_help(
                 r#"Type of query to search. Default is to search for any instance of a literal value (`simple`)
-`simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `ocrlocate one two` matches "needleone twoneedle"
+`simple`: Passes sqlite fts5 the queries combined into one search phrase, i.e. `one two` matches "needleone twoneedle"
 `match`: Passes sqlite fts5 the argument as an unescaped match query: https://www.sqlite.org/fts5.html#full_text_query_syntax.
     This is most useful if you are looking for a result that matches several terms anywhere, not just one long term
-    Note that all queries are prefix queries with the tokenizer we use.
+    Note that all queries are prefix queries with the tokenizer we use
     Examples: `ocrlocate -s match one AND '"AND"'`
               `ocrlocate -s match needle NOT dontfind`
 `glob`: Passes sqlite fts5 the argument as a glob query, which supports [a-z], *, and ?
@@ -187,7 +187,8 @@ Matched directories will not be descended into.  Excluded items will be removed 
     The syntax is documented in here: https://sqlite.org/src/artifact?name=4204c561&ln=698
     To escape characters, include them in a set: [*], [[]
 `regex`: Runs the regular expression on every row instead of using the index
-    Uses the rust regex syntax https://docs.rs/regex/latest/regex/index.html#syntax"#
+    Uses the rust regex syntax https://docs.rs/regex/latest/regex/index.html#syntax
+    This is the only search method that is case sensitive"#
             ).value_parser(PossibleValuesParser::new(["simple", "match", "glob", "regex"]).map(|x| -> SearchType {
                 match x.to_ascii_lowercase().as_str() {
                     "simple" => SearchType::Simple,
