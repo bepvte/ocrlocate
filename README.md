@@ -85,11 +85,71 @@ Options:
           Print version
 ```
 
-## Dependencies
-You will need tesseract language packs for your target language, and libleptonica-dev. If you arent installing it with --features bundled you will need libtesseract-dev too.
+## Compiling and installing on Linux
 
-## Installation
-Run `cargo install --git https://github.com/bepvte/ocrlocate`.
+You will need tesseract language packs for your target language, and libleptonica-dev. If you arent installing it with `--features bundled` you will need libtesseract-dev too.
+
+Run `cargo install --git https://github.com/bepvte/ocrlocate`
+
+## Compiling and installing on Windows
+
+### Prerequisites
+
+Ensure you have the following installed:
+
+1. **Rust Toolchain**: <https://rustup.rs/>
+
+2. **Git**: <https://git-scm.com/download/win>
+
+3. **LLVM**: Install `LLVM-{ver}-win64.exe` from <https://github.com/llvm/llvm-project/releases/>. LLVM provides `clang.dll` and `libclang.dll`, which is required for compiling dependencies.
+
+4. **Tesseract OCR**: Download and install `tesseract-ocr-w64-setup-{version}.exe` from <https://github.com/tesseract-ocr/tesseract/releases/>. During installation, ensure you select the languages you want to use with ocrlocate.
+
+5. (Unsure if needed, you can try without it and if something breaks try this) Install "Desktop development with C++" workload from <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022>
+
+### Step 1: Set up vcpkg
+
+```
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+.\bootstrap-vcpkg.bat
+```
+
+### Step 2: Install Dependencies with vcpkg
+
+It may be slow (like 40 mins)
+
+```
+.\vcpkg.exe install leptonica:x64-windows-static-md
+.\vcpkg.exe install tesseract:x64-windows-static-md
+```
+
+### Step 3: Clone ocrlocate
+
+```
+git clone https://github.com/bepvte/ocrlocate.git
+cd .\ocrlocate
+```
+
+### Step 4: Build and Install ocrlocate
+
+```
+$Env:VCPKG_ROOT="<YOUR_VCPKG_ROOT_PATH>"
+cargo install --path .
+```
+
+### Step 5: Configure Tesseract Data Path
+
+Tesseract requires access to its language data files (tessdata). You need to set the `TESSDATA_PREFIX` environment variable to the directory containing these files. A common location for `tessdata` after installing Tesseract is `C:\Program Files\Tesseract-OCR\tessdata`.
+
+**To set it permanently (recommended):**
+
+1. Search for "Environment Variables" in the Windows search bar and select "Edit the system environment variables".
+2. Click "Environment Variables..." in the System Properties window.
+3. Under "System variables", click "New...".
+4. For "Variable name", enter `TESSDATA_PREFIX`.
+5. For "Variable value", enter the path to your `tessdata` directory (e.g., `C:\Program Files\Tesseract-OCR\tessdata`).
+6. Click "OK" on all windows to save the changes. You may need to restart your terminal or computer for the changes to take effect.
 
 ## Performance
 To increase the performance by around 3-4 images per second, compile the bundled tesseract which should not use the slower OpenMP functions with `cargo install --git https://github.com/bepvte/ocrlocate -vv --features bundled`.
