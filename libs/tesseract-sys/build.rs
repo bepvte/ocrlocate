@@ -127,7 +127,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
     use cmake::Config;
     use std::process::Command;
 
-    let tesseract_ver = "f657ec2213cc7349dcb9b5fb6c1cd036c1c74813";
+    let tesseract_ver = "2b07505e0e86026ae7c10767b334c337ccf06576";
     let tesseract_url =
         format!("https://github.com/tesseract-ocr/tesseract/archive/{tesseract_ver}.tar.gz");
 
