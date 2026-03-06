@@ -1,6 +1,6 @@
 {
-  "default-triplet": "x64-windows-static",
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
-    "leptonica"
+        "leptonica"
   ]
 }
