@@ -97,6 +97,7 @@ jobs:
           cargo build --release --locked --features bundled
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
+          VCPKGSRS_TRIPLET: "x64-windows-static"
       
       - name: Download language data
         run: |
