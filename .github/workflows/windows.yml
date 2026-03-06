@@ -45,6 +45,7 @@ jobs:
         run: cargo install vcpkg_cli
       
       - name: Debug env
+        shell: bash
         run: |
           echo "VCPKG_ROOT: $env:VCPKG_ROOT"
           echo "PATH: $env:PATH"
