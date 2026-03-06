@@ -81,7 +81,7 @@ jobs:
           cd $RUNNER_TEMP
           git clone https://github.com/mcgoo/vcpkg-rs.git
           cd vcpkg-rs
-          cargo install ./vcpkg_cli
+          cargo install --path ./vcpkg_cli
           vcpkg_cli probe -l static leptonica
       
       - name: Build
