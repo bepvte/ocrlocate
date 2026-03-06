@@ -38,19 +38,24 @@ jobs:
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
-          path: ${{env.VCPKG_INSTALLATION_ROOT}}\packages
+          path: |
+            ${{env.VCPKG_INSTALLATION_ROOT}}\packages
+            ${{env.VCPKG_INSTALLATION_ROOT}}\installed
           key: ${{ runner.os }}-vcpkg
       
       - name: Install leptonica
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
           vcpkg install leptonica:x64-windows-static
       
       - name: Save to cache
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ${{env.VCPKG_INSTALLATION_ROOT}}\packages
+          path: |
+            ${{env.VCPKG_INSTALLATION_ROOT}}\packages
+            ${{env.VCPKG_INSTALLATION_ROOT}}\installed
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       # - name: Setup vcpkg
@@ -82,7 +87,8 @@ jobs:
           cd $RUNNER_TEMP
           git clone https://github.com/mcgoo/vcpkg-rs.git
           cd vcpkg-rs
-          cargo install --path ./vcpkg_cli
+          cargo install --path ./vcpkg_cli --debug
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
           vcpkg_cli probe -l static leptonica
       
       - name: Build
