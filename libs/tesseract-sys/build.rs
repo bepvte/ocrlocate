@@ -155,19 +155,11 @@ fn find_tesseract_system_lib() -> Vec<String> {
         panic!("failed to download tesseract");
     }
 
-    let mut tar = if cfg!(windows) {
-        let mut cmd = Command::new("cmake");
-        cmd.args(["-E", "tar", "xzf", &tess_tgz]);
-        cmd
-    } else {
-        let mut cmd = Command::new("tar");
-        cmd.args(["-xzf", &tess_tgz]);
-        cmd
-    };
-    let tar_status = tar
+    let tar_status = Command::new("tar")
         .current_dir(&out_dir)
+        .args(["-xzf", &tess_tgz])
         .status()
-        .expect("failed to execute archive extraction for tesseract");
+        .expect("failed to execute tar to unarchive tesseract");
     if !tar_status.success() {
         panic!("failed to unarchive tesseract");
     }
@@ -216,6 +208,11 @@ fn find_tesseract_system_lib() -> Vec<String> {
 
     #[cfg(windows)]
     cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix);
+
+    #[cfg(windows)]
+    {
+        cm.cflag("/utf-8").cxxflag("/utf-8");
+    }
 
     if env::var("CI").is_err()
         && env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|x| x.contains("target-cpu=native"))
