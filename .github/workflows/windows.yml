@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     
     steps:
       - name: Checkout
@@ -31,7 +31,10 @@ jobs:
           arch: x64
       
       - name: Get env
-        run: echo "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
+        run: |
+          echo $env:VCPKG_INSTALLATION_ROOT
+          echo $env:VCPKG_ROOT
+          echo "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
       
       - name: Restore cache
         id: cache-restore
