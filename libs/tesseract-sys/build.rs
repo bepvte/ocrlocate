@@ -185,6 +185,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .define("GRAPHICS_DISABLED", "ON")
         .define("DISABLE_ARCHIVE", "ON")
         .define("DISABLE_CURL", "ON")
+        .define("SW_BUILD", "OFF")
         // this flag disables tesseract recompressing every image as a png
         // no idea why anyone would do that
         .cflag("-DTESSERACT_IMAGEDATA_AS_PIX")
