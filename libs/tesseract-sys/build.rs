@@ -234,8 +234,10 @@ fn find_tesseract_system_lib() -> Vec<String> {
         if cfg!(debug_assertions) { "d" } else { "" }
     );
     #[cfg(not(windows))]
-    println!("cargo:rustc-link-lib=static=tesseract");
-    println!("cargo:rustc-link-lib=stdc++");
+    {
+        println!("cargo:rustc-link-lib=static=tesseract");
+        println!("cargo:rustc-link-lib=stdc++");
+    }
 
     vec![src_dir
         .join("include")
