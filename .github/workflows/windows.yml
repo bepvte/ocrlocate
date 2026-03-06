@@ -31,6 +31,7 @@ jobs:
           vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
           vcpkgJsonGlob: "vcpkg.json"
           runVcpkgInstall: true
+          doNotCache: false
         env:
           VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
       
