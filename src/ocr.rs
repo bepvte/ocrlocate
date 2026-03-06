@@ -40,7 +40,7 @@ impl Ocr {
                     &CString::new("/dev/null").unwrap(),
                 )
                 .unwrap();
-            set_log_level(leptonica_sys::L_SEVERITY_ERROR);
+            set_log_level(leptonica_sys::L_SEVERITY_ERROR.try_into().unwrap());
         }
         if let Some(binarization) = binarization {
             leptess
@@ -77,7 +77,7 @@ impl Ocr {
         let filename = CString::new(img.as_str()).expect("null in filename");
         let mut cpix = leptonica_plumbing::Pix::read_with_hint(
             &filename,
-            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA,
+            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA.try_into().unwrap(),
         )?;
 
         if let Some(scale) = self.scale {
@@ -92,9 +92,9 @@ impl Ocr {
     }
 }
 
-fn set_log_level(level: u32) {
+fn set_log_level(level: i32) {
     unsafe {
-        leptonica_sys::setMsgSeverity(level.try_into().unwrap());
+        leptonica_sys::setMsgSeverity(level);
     }
 }
 
