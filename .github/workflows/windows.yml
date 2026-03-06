@@ -32,9 +32,7 @@ jobs:
       
       - name: Get env
         run: |
-          echo $env:VCPKG_INSTALLATION_ROOT
-          echo $env:VCPKG_ROOT
-          echo "VCPKG_INSTALLATION_ROOT=${env:VCPKG_INSTALLATION_ROOT}" >> $GITHUB_ENV
+          echo "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
       
       - name: Restore cache
         id: cache-restore
