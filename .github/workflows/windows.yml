@@ -31,13 +31,13 @@ jobs:
           arch: x64
       
       - name: Get env
-        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
+        run: echo "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
       
       - name: Restore cache
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
-          path: ${{env.VCPKG_ROOT}}\\packages
+          path: ${{env.VCPKG_INSTALLATION_ROOT}}\\packages
           key: ${{ runner.os }}-vcpkg
       
       - name: Install leptonica
@@ -49,7 +49,7 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ${{env.VCPKG_ROOT}}\\packages
+          path: ${{env.VCPKG_INSTALLATION_ROOT}}\\packages
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       # - name: Setup vcpkg
@@ -85,10 +85,11 @@ jobs:
           vcpkg_cli probe -l static leptonica
       
       - name: Build
-        run: cargo build --release --locked --features bundled
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cargo build --release --locked --features bundled
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
-          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
       
       - name: Download language data
         run: |
