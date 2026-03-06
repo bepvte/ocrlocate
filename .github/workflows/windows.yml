@@ -10,6 +10,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  USERNAME: ${{ github.repository_owner }}
+  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+  FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+
+permissions:
+  packages: write
 
 jobs:
   build-windows:
@@ -24,16 +31,30 @@ jobs:
         with:
           arch: x64
       
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+      - name: Get env
+        run: echo "VCPKG_ROOT=$env:VCPKG_ROOT" >> $GITHUB_ENV
+      
+      - name: cache
+        uses: actions/cache@v5
         with:
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
-          vcpkgJsonGlob: "vcpkg.json"
-          runVcpkgInstall: true
-          doNotCache: false
-        env:
-          VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
+          path: ${{env.VCPKG_ROOT}}/packages/
+          key: ${{ runner.os }}-vcpkg
+      
+      - name: install leptonica
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          vcpkg install leptonica:x64-windows-static
+
+      # - name: Setup vcpkg
+      #   uses: lukka/run-vcpkg@v11
+      #   with:
+      #     vcpkgDirectory: ${{ github.workspace }}/vcpkg
+      #     vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
+      #     vcpkgJsonGlob: "vcpkg.json"
+      #     runVcpkgInstall: true
+      #     doNotCache: false
+      #   env:
+      #     VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
       
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -41,18 +62,12 @@ jobs:
           toolchain: stable
           target: x86_64-pc-windows-msvc
       
-      - name: Install vcpkg_cli
-        run: cargo install vcpkg_cli
-      
       - name: Debug env
         run: |
           echo "VCPKG_ROOT: $env:VCPKG_ROOT"
           echo "PATH: $env:PATH"
           echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          ls ${{ github.workspace }}/vcpkg/
-      
-      - name: Install leptonica
-        run: ${{ github.workspace }}/vcpkg/vcpkg install leptonica:x64-windows-static
+          ls $env:VCPKG_ROOT/packages/
       
       - name: Probe leptonica
         run: |
@@ -62,18 +77,11 @@ jobs:
           cargo install ./vcpkg_cli
           vcpkg_cli probe -l static leptonica
       
-      - name: List vcpkg contents
-        run: |
-          echo "=== vcpkg installed packages ==="
-          ls -la ${{ github.workspace }}/vcpkg/installed/
-          ls -la ${{ github.workspace }}/vcpkg/installed/x64-windows-static/
-          ls -la ${{ github.workspace }}/vcpkg/installed/x64-windows-static/lib/
-      
       - name: Build
         run: cargo build --release --locked --features bundled
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
-          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
       
       - name: Download language data
         run: |
