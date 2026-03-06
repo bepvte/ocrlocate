@@ -38,7 +38,7 @@ jobs:
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
-          path: ${{env.VCPKG_INSTALLATION_ROOT}}\\packages
+          path: ${{env.VCPKG_INSTALLATION_ROOT}}\packages
           key: ${{ runner.os }}-vcpkg
       
       - name: Install leptonica
@@ -50,7 +50,7 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ${{env.VCPKG_INSTALLATION_ROOT}}\\packages
+          path: ${{env.VCPKG_INSTALLATION_ROOT}}\packages
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       # - name: Setup vcpkg

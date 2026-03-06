@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use vcpkg;
 
 #[cfg(windows)]
+#[cfg(not(feature = "bundled"))]
 fn find_tesseract_system_lib() -> Vec<String> {
     println!("cargo:rerun-if-env-changed=TESSERACT_INCLUDE_PATHS");
     println!("cargo:rerun-if-env-changed=TESSERACT_LINK_PATHS");
