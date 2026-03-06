@@ -207,7 +207,8 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .cxxflag("-DTESSERACT_IMAGEDATA_AS_PIX");
 
     #[cfg(windows)]
-    cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix);
+    cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix)
+        .profile("Release");
 
     #[cfg(windows)]
     {
@@ -229,13 +230,13 @@ fn find_tesseract_system_lib() -> Vec<String> {
         dst.join("lib").to_str().unwrap()
     );
     #[cfg(windows)]
-    println!(
-        "cargo:rustc-link-lib=static=tesseract55{}",
-        if cfg!(debug_assertions) { "d" } else { "" }
-    );
+    println!("cargo:rustc-link-lib=static=tesseract55");
     #[cfg(not(windows))]
     {
         println!("cargo:rustc-link-lib=static=tesseract");
+    }
+    #[cfg(not(target_env = "msvc"))]
+    {
         println!("cargo:rustc-link-lib=stdc++");
     }
 
