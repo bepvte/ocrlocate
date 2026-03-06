@@ -34,16 +34,24 @@ jobs:
       - name: Get env
         run: echo "VCPKG_ROOT=$env:VCPKG_ROOT" >> $GITHUB_ENV
       
-      - name: cache
-        uses: actions/cache@v5
+      - name: cache restore
+        id: cache-restore
+        uses: actions/cache/restore@v5
         with:
           path: ${{env.VCPKG_ROOT}}/packages/
           key: ${{ runner.os }}-vcpkg
       
       - name: install leptonica
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache-restore.outputs.cache-hit != 'true'
         run: |
           vcpkg install leptonica:x64-windows-static
+      
+      - name: cache save
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{env.VCPKG_ROOT}}/packages/
+          key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       # - name: Setup vcpkg
       #   uses: lukka/run-vcpkg@v11
