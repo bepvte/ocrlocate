@@ -1,0 +1,65 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+      
+      - name: Install leptonica
+        run: vcpkg install leptonica:x64-windows-static
+      
+      - name: Build
+        run: cargo build --release --locked --features bundled
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+          VCPKGRS_STATIC: "1"
+      
+      - name: Download language data
+        run: |
+          mkdir tessdata
+          $baseUrl = "https://github.com/tesseract-ocr/tessdata/raw/main"
+          @("eng", "osd") | ForEach-Object {
+            Invoke-WebRequest -Uri "$baseUrl/$_.traineddata" -OutFile "tessdata/$_.traineddata"
+          }
+      
+      - name: Package
+        run: |
+          $packageDir = "ocrlocate-windows"
+          mkdir $packageDir
+          Copy-Item "target\release\ocrlocate.exe" $packageDir
+          Copy-Item "tessdata" "$packageDir\tessdata" -Recurse
+          Compress-Archive -Path $packageDir -DestinationPath "ocrlocate-x86_64-pc-windows-msvc.zip"
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocrlocate-windows
+          path: ocrlocate-x86_64-pc-windows-msvc.zip
+      
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ocrlocate-x86_64-pc-windows-msvc.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
