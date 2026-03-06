@@ -155,11 +155,19 @@ fn find_tesseract_system_lib() -> Vec<String> {
         panic!("failed to download tesseract");
     }
 
-    let tar_status = Command::new("tar")
+    let mut tar = if cfg!(windows) {
+        let mut cmd = Command::new("cmake");
+        cmd.args(["-E", "tar", "xzf", &tess_tgz]);
+        cmd
+    } else {
+        let mut cmd = Command::new("tar");
+        cmd.args(["-xzf", &tess_tgz]);
+        cmd
+    };
+    let tar_status = tar
         .current_dir(&out_dir)
-        .args(["-xzf", &tess_tgz])
         .status()
-        .expect("failed to execute tar to unarchive tesseract");
+        .expect("failed to execute archive extraction for tesseract");
     if !tar_status.success() {
         panic!("failed to unarchive tesseract");
     }
