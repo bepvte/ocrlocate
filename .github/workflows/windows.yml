@@ -41,7 +41,7 @@ jobs:
           path: |
             ${{env.VCPKG_INSTALLATION_ROOT}}\packages
             ${{env.VCPKG_INSTALLATION_ROOT}}\installed
-          key: ${{ runner.os }}-vcpkg
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('.github/workflows/windows.yml') }}
       
       - name: Install leptonica
         if: steps.cache-restore.outputs.cache-hit != 'true'
@@ -97,7 +97,7 @@ jobs:
           cargo build --release --locked --features bundled
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
-          VCPKGSRS_TRIPLET: "x64-windows-static"
+          VCPKGRS_TRIPLET: "x64-windows-static"
       
       - name: Download language data
         run: |
