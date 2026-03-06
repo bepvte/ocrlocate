@@ -45,12 +45,11 @@ jobs:
         run: cargo install vcpkg_cli
       
       - name: Debug env
-        shell: bash
         run: |
           echo "VCPKG_ROOT: $env:VCPKG_ROOT"
           echo "PATH: $env:PATH"
           echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          ls -la ${{ github.workspace }}/vcpkg/
+          ls ${{ github.workspace }}/vcpkg/
       
       - name: Install leptonica
         run: ${{ github.workspace }}/vcpkg/vcpkg install leptonica:x64-windows-static
