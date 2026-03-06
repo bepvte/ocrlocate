@@ -81,6 +81,7 @@ jobs:
           echo "PATH: $env:PATH"
           echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
           ls $env:VCPKG_INSTALLATION_ROOT/packages/
+          ls $env:VCPKG_INSTALLATION_ROOT/installed/
       
       - name: Probe leptonica
         run: |
