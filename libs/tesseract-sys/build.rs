@@ -242,7 +242,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
 fn find_tessdata_path() -> String {
     println!("cargo:rerun-if-env-changed=TESSDATA_PREFIX");
     if let Ok(envvar) = env::var("TESSDATA_PREFIX") {
-        return envvar;
+        return envvar.trim_end_matches(['/', '\\']).to_string();
     }
     for p in [
         "/usr/share/tessdata",
