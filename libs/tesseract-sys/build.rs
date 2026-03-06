@@ -168,6 +168,21 @@ fn find_tesseract_system_lib() -> Vec<String> {
         .join(format!("tesseract-{tesseract_ver}"))
         .to_owned();
 
+    #[cfg(windows)]
+    let leptonica = vcpkg::Config::new()
+        .cargo_metadata(false)
+        .find_package("leptonica")
+        .expect("failed to find leptonica with vcpkg");
+
+    #[cfg(windows)]
+    let leptonica_prefix = leptonica
+        .include_paths
+        .first()
+        .and_then(|p| p.parent())
+        .or_else(|| leptonica.link_paths.first().and_then(|p| p.parent()))
+        .expect("vcpkg did not report a usable leptonica prefix")
+        .to_path_buf();
+
     let mut cm = Config::new(&src_dir);
     cm.define("TESSDATA_PREFIX", find_tessdata_path())
         .define(
@@ -190,6 +205,9 @@ fn find_tesseract_system_lib() -> Vec<String> {
         // no idea why anyone would do that
         .cflag("-DTESSERACT_IMAGEDATA_AS_PIX")
         .cxxflag("-DTESSERACT_IMAGEDATA_AS_PIX");
+
+    #[cfg(windows)]
+    cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix);
 
     if env::var("CI").is_err()
         && env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|x| x.contains("target-cpu=native"))
