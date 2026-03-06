@@ -18,7 +18,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
+      
+      - name: Setup MSVC
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+      
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
@@ -34,6 +39,34 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-pc-windows-msvc
+      
+      - name: Install vcpkg_cli
+        run: cargo install vcpkg_cli
+      
+      - name: Debug env
+        run: |
+          echo "VCPKG_ROOT: $env:VCPKG_ROOT"
+          echo "PATH: $env:PATH"
+          echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
+          ls -la ${{ github.workspace }}/vcpkg/
+      
+      - name: Install leptonica
+        run: ${{ github.workspace }}/vcpkg/vcpkg install leptonica:x64-windows-static
+      
+      - name: Probe leptonica
+        run: |
+          cd $RUNNER_TEMP
+          git clone https://github.com/mcgoo/vcpkg-rs.git
+          cd vcpkg-rs
+          cargo install ./vcpkg_cli
+          vcpkg_cli probe -l static leptonica
+      
+      - name: List vcpkg contents
+        run: |
+          echo "=== vcpkg installed packages ==="
+          ls -la ${{ github.workspace }}/vcpkg/installed/
+          ls -la ${{ github.workspace }}/vcpkg/installed/x64-windows-static/
+          ls -la ${{ github.workspace }}/vcpkg/installed/x64-windows-static/lib/
       
       - name: Build
         run: cargo build --release --locked --features bundled
