@@ -170,6 +170,7 @@ jobs:
           name: windows-build-log
           path: build.log
           if-no-files-found: warn
+          archive: false
 
       - name: Download language data
         run: |

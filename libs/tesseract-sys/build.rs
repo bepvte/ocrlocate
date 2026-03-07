@@ -187,7 +187,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
     cm.define("TESSDATA_PREFIX", find_tessdata_path())
         .define(
             "ENABLE_LTO",
-            if cfg!(not(debug_assertions)) {
+            if cfg!(all(not(debug_assertions), not(windows))) {
                 "ON"
             } else {
                 "OFF"
