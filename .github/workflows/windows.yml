@@ -95,7 +95,12 @@ jobs:
       - name: Build
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
-          cargo rustc --release --locked --features bundled -vvv -- -C link-arg=/VERBOSE:LIB
+          $logPath = Join-Path $env:GITHUB_WORKSPACE "build.log"
+          Remove-Item $logPath -ErrorAction SilentlyContinue
+          cargo rustc --release --locked --features bundled -vvv -- -C link-arg=/VERBOSE:LIB > $logPath 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
@@ -151,7 +156,21 @@ jobs:
           Write-Host "cargo:rustc-link lines emitted by build scripts"
           Get-ChildItem -Path $buildDir -Recurse -Filter output -ErrorAction SilentlyContinue |
             Select-String "cargo:rustc-link|cargo:warning|CMAKE_PREFIX_PATH|tesseract55|leptonica" -ErrorAction SilentlyContinue
-      
+
+          $logPath = Join-Path $env:GITHUB_WORKSPACE "build.log"
+          if (Test-Path $logPath) {
+            Write-Host "Key lines from build.log"
+            Select-String -Path $logPath -Pattern "link.exe|unresolved external|Searching libraries|Finished|error:" -Context 0,2 -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-build-log
+          path: build.log
+          if-no-files-found: warn
+
       - name: Download language data
         run: |
           mkdir tessdata
