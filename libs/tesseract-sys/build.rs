@@ -227,7 +227,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
         dst.join("lib").to_str().unwrap()
     );
     #[cfg(windows)]
-    println!("cargo:rustc-link-lib=static:tesseract55");
+    println!("cargo:rustc-link-lib=static=tesseract55");
     #[cfg(not(windows))]
     {
         println!("cargo:rustc-link-lib=static=tesseract");

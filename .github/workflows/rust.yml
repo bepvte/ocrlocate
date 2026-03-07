@@ -18,8 +18,10 @@ jobs:
       - name: Refresh font cache
         run: sudo fc-cache -v
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-all-crates: true
 
       - name: Build
         run: cargo build --locked
