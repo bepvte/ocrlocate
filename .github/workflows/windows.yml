@@ -41,7 +41,7 @@ jobs:
           path: |
             ${{env.VCPKG_INSTALLATION_ROOT}}\packages
             ${{env.VCPKG_INSTALLATION_ROOT}}\installed
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('.github/workflows/windows.yml') }}
+          key: ${{ runner.os }}-vcpkg-2026-03-06
       
       - name: Install leptonica
         if: steps.cache-restore.outputs.cache-hit != 'true'
