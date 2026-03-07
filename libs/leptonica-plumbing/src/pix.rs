@@ -14,12 +14,14 @@ use thiserror::Error;
 pub struct Pix(*mut leptonica_sys::Pix);
 
 /// Error returned by Pix::read_mem
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum PixReadMemError {
     #[error("Pix::read_mem returned null")]
     NullPtr,
     #[error("Failed to convert image size")]
     ImageSizeConversion(#[from] TryFromIntError),
+    #[error(transparent)]
+    Io(#[from] io::Error),
 }
 
 impl From<Infallible> for PixReadMemError {
@@ -30,12 +32,9 @@ impl From<Infallible> for PixReadMemError {
 
 /// Error returned by Pix::read
 #[derive(Debug, Error)]
-pub enum PixReadError {
-    #[error("Pix::read returned null")]
-    NullPtr,
-    #[error(transparent)]
-    Io(#[from] io::Error), 
-}
+#[error("Pix::read returned null")]
+pub struct PixReadError();
+
 
 #[derive(Debug, Error, PartialEq)]
 pub enum PixManipError {
@@ -120,7 +119,7 @@ impl Pix {
     pub fn read(filename: &CStr) -> Result<RefCountedExclusive<Self>, PixReadError> {
         let ptr = unsafe { pixRead(filename.as_ptr()) };
         if ptr.is_null() {
-            Err(PixReadError::NullPtr)
+            Err(PixReadError())
         } else {
             Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
         }
@@ -150,7 +149,7 @@ impl Pix {
     ) -> Result<RefCountedExclusive<Self>, PixReadError> {
         let ptr = unsafe { pixReadWithHint(filename.as_ptr(), hint as i32) };
         if ptr.is_null() {
-            Err(PixReadError::NullPtr)
+            Err(PixReadError())
         } else {
             Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
         }
@@ -159,11 +158,11 @@ impl Pix {
     pub fn read_stream(
         file: File,
         hint: u32,
-    ) -> Result<RefCountedExclusive<Self>, PixReadError> {
+    ) -> Result<RefCountedExclusive<Self>, PixReadMemError> {
         let cfile = file_to_cfile(file)?;
         let ptr = unsafe { pixReadStream(cfile as _, hint as i32) };
         if ptr.is_null() {
-            Err(PixReadError::NullPtr)
+            Err(PixReadMemError::NullPtr)
         } else {
             Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
         }
@@ -242,7 +241,11 @@ mod tests {
 
     #[test]
     fn read_mem_error_test() {
-        assert_eq!(Pix::read_mem(&[]).err(), Some(PixReadMemError::NullPtr));
+        match Pix::read_mem(&[0; 16]) {
+            Err(PixReadMemError::NullPtr) => (),
+            Err(e) => panic!("Unexpected error: {}", e),
+            Ok(_) => panic!("Expected error, got success"),
+        }
     }
 
     #[test]

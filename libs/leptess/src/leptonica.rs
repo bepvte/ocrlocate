@@ -66,6 +66,7 @@ pub fn pix_read_mem(img: &[u8]) -> Result<Pix, PixError> {
             Err(PixError::MemoryTooLarge { source })
         }
         Err(leptonica_plumbing::PixReadMemError::NullPtr) => Err(PixError::ReadFrom("memory")),
+        Err(leptonica_plumbing::PixReadMemError::Io(e)) => unreachable!("Unexpected IO error: {}", e),
         Ok(raw) => Ok(Pix {
             raw: raw.to_ref_counted(),
         }),
