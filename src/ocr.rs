@@ -77,7 +77,7 @@ impl Ocr {
         let file = File::open(img)?;
         let mut cpix = leptonica_plumbing::Pix::read_stream(
             file,
-            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA,
+            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA as _,
         )?;
 
         if let Some(scale) = self.scale {
