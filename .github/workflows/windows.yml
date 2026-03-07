@@ -10,12 +10,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # USERNAME: ${{ github.repository_owner }}
-  # FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-  # VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
 
 permissions:
   packages: write
+  contents: write
 
 jobs:
   build-windows:
@@ -73,95 +71,18 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: x86_64-pc-windows-msvc
+          rustflags: ""
+          cache-all-crates: true
       
-      - name: Debug env
-        run: |
-          echo "VCPKG_ROOT: $env:VCPKG_INSTALLATION_ROOT"
-          echo "PATH: $env:PATH"
-          echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          ls $env:VCPKG_INSTALLATION_ROOT/packages/
-          ls $env:VCPKG_INSTALLATION_ROOT/installed/
-
       - name: Build
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
-          $logPath = Join-Path $env:GITHUB_WORKSPACE "build.log"
-          Remove-Item $logPath -ErrorAction SilentlyContinue
-          cargo rustc --release --locked --features bundled -vvv -- -C link-arg=/VERBOSE:LIB > $logPath 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          cargo build --release --locked --features bundled 
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
           TESSDATA_PREFIX: ".\tessdata"
         
-      - name: debug build output on failure
-        if: failure()
-        run: |
-          $buildDir = Join-Path $env:GITHUB_WORKSPACE "target\release\build"
-          Write-Host "Searching for tesseract libraries under: $buildDir"
-          Write-Host "PWD: $(Get-Location)"
-          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Write-Host "VCPKG_INSTALLATION_ROOT: $env:VCPKG_INSTALLATION_ROOT"
-          Write-Host "VCPKG_ROOT: $env:VCPKG_ROOT"
-          Write-Host "VCPKGRS_TRIPLET: $env:VCPKGRS_TRIPLET"
-          Write-Host "TESSDATA_PREFIX: $env:TESSDATA_PREFIX"
-
-          Write-Host "Listing target\\release"
-          Get-ChildItem -Path (Join-Path $env:GITHUB_WORKSPACE "target\release") -Force -ErrorAction SilentlyContinue
-
-          Write-Host "Listing target\\release\\build"
-          Get-ChildItem -Path $buildDir -Force -ErrorAction SilentlyContinue
-
-          Write-Host "Recent tesseract-sys build outputs"
-          Get-ChildItem -Path $buildDir -Directory -Filter "tesseract-sys-*" -ErrorAction SilentlyContinue | Select-Object FullName
-
-          $libs = Get-ChildItem -Path $buildDir -Recurse -Filter "tesseract*.lib" -ErrorAction SilentlyContinue
-          if (-not $libs) {
-            Write-Host "No tesseract libraries found"
-            exit 1
-          }
-
-          $libs | Select-Object FullName
-
-          $targetLib = $libs | Where-Object { $_.Name -eq "tesseract55.lib" } | Select-Object -First 1
-          if (-not $targetLib) {
-            $targetLib = $libs | Select-Object -First 1
-            Write-Host "tesseract55.lib not found, falling back to: $($targetLib.FullName)"
-          }
-
-          Write-Host "Inspecting symbols in: $($targetLib.FullName)"
-          dumpbin /LINKERMEMBER:1 "$($targetLib.FullName)" | Select-String "TessBaseAPICreate|TessBaseAPIInit3|TessBaseAPISetImage2|TessBaseAPIGetUTF8Text|TessDeleteText"
-
-          Write-Host "Linker directives in selected library"
-          dumpbin /DIRECTIVES "$($targetLib.FullName)"
-
-          Write-Host "Nearby build artifacts"
-          Get-ChildItem -Path $targetLib.Directory.FullName -Force -ErrorAction SilentlyContinue | Select-Object Name,Length
-
-          Write-Host "Cargo output files near selected library"
-          Get-ChildItem -Path $buildDir -Recurse -Include output,root-output,stderr -ErrorAction SilentlyContinue | Select-Object FullName
-
-          Write-Host "cargo:rustc-link lines emitted by build scripts"
-          Get-ChildItem -Path $buildDir -Recurse -Filter output -ErrorAction SilentlyContinue |
-            Select-String "cargo:rustc-link|cargo:warning|CMAKE_PREFIX_PATH|tesseract55|leptonica" -ErrorAction SilentlyContinue
-
-          $logPath = Join-Path $env:GITHUB_WORKSPACE "build.log"
-          if (Test-Path $logPath) {
-            Write-Host "Key lines from build.log"
-            Select-String -Path $logPath -Pattern "link.exe|unresolved external|Searching libraries|Finished|error:" -Context 0,2 -ErrorAction SilentlyContinue
-          }
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-build-log
-          path: build.log
-          if-no-files-found: warn
-          archive: false
-
       - name: Download language data
         run: |
           mkdir tessdata
@@ -183,6 +104,7 @@ jobs:
         with:
           name: ocrlocate-windows
           path: ocrlocate-x86_64-pc-windows-msvc.zip
+          archive: false
       
       - name: Release
         uses: softprops/action-gh-release@v2
