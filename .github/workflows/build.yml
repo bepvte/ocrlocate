@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash -c "docker exec -i rust sh -c < {0}"
+        shell: bash -c "docker exec -i rust sh < {0}"
     steps:
       - uses: actions/checkout@v6
 
@@ -49,6 +49,7 @@ jobs:
             tail -f /dev/null
 
       - name: Setup Rust
+        if: false
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache-all-crates: true
