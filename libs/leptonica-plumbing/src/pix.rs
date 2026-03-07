@@ -1,10 +1,11 @@
 use leptonica_sys::{
-    l_float32, l_int32, l_uint32, pixClone, pixDestroy, pixGetData, pixGetDepth, pixGetHeight,
-    pixGetWidth, pixRead, pixReadMem, pixReadWithHint, pixScaleGeneral, pixTransferAllData,
+    l_float32, l_int32, l_uint32, pixClone, pixDestroy, pixGetData, pixGetDepth, pixGetHeight, pixGetWidth, pixRead, pixReadMem, pixReadStream, pixReadWithHint, pixScaleGeneral, pixTransferAllData
 };
 
 use crate::memory::{LeptonicaClone, LeptonicaDestroy, RefCountedExclusive};
 use std::convert::{AsRef, Infallible, TryInto};
+use std::fs::File;
+use std::io;
 use std::{ffi::CStr, num::TryFromIntError};
 use thiserror::Error;
 
@@ -29,8 +30,12 @@ impl From<Infallible> for PixReadMemError {
 
 /// Error returned by Pix::read
 #[derive(Debug, Error)]
-#[error("Pix::read returned null")]
-pub struct PixReadError();
+pub enum PixReadError {
+    #[error("Pix::read returned null")]
+    NullPtr,
+    #[error(transparent)]
+    Io(#[from] io::Error), 
+}
 
 #[derive(Debug, Error, PartialEq)]
 pub enum PixManipError {
@@ -64,6 +69,39 @@ impl AsMut<leptonica_sys::Pix> for Pix {
     }
 }
 
+#[cfg(not(windows))]
+fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
+    use std::os::unix::io::IntoRawFd;
+    let file = file.into_raw_fd();
+    
+    let fp = unsafe { libc::fdopen(file, b"rb\0".as_ptr() as _) };
+    if fp.is_null() {
+        unsafe { libc::fclose(fp); }
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(fp)
+    }
+}
+
+#[cfg(windows)]
+fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
+    use std::os::windows::io::IntoRawHandle;
+
+    let handle = file.into_raw_handle();
+    let fd = unsafe { libc::open_osfhandle(handle as isize, libc::O_RDONLY) };
+    if fd == -1 {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid file handle"));
+    }
+
+    let fp = unsafe { libc::fdopen(fd, b"rb\0".as_ptr() as _) };
+    if fp.is_null() {
+        unsafe { libc::close(fd); }
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(fp)
+    }
+}
+
 impl Pix {
     /// Create a new instance from a pointer
     ///
@@ -82,7 +120,7 @@ impl Pix {
     pub fn read(filename: &CStr) -> Result<RefCountedExclusive<Self>, PixReadError> {
         let ptr = unsafe { pixRead(filename.as_ptr()) };
         if ptr.is_null() {
-            Err(PixReadError())
+            Err(PixReadError::NullPtr)
         } else {
             Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
         }
@@ -112,7 +150,20 @@ impl Pix {
     ) -> Result<RefCountedExclusive<Self>, PixReadError> {
         let ptr = unsafe { pixReadWithHint(filename.as_ptr(), hint as i32) };
         if ptr.is_null() {
-            Err(PixReadError())
+            Err(PixReadError::NullPtr)
+        } else {
+            Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
+        }
+    }
+
+    pub fn read_stream(
+        file: File,
+        hint: u32,
+    ) -> Result<RefCountedExclusive<Self>, PixReadError> {
+        let cfile = file_to_cfile(file)?;
+        let ptr = unsafe { pixReadStream(cfile as _, hint as i32) };
+        if ptr.is_null() {
+            Err(PixReadError::NullPtr)
         } else {
             Ok(unsafe { RefCountedExclusive::new(Self(ptr)) })
         }

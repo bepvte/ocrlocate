@@ -142,7 +142,8 @@ fn cli() -> Command {
                 dirs::data_local_dir().expect("the user's local data dirctory should exist"),
             )
             .unwrap()
-            .join("ocrlocate/index.db"),
+            .join("ocrlocate")
+            .join("index.db"),
         )
         .unwrap();
 

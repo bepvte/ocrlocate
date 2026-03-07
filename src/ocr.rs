@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use camino::Utf8Path as Path;
-use std::ffi::CString;
+use std::{ffi::CString, fs::File};
 
 use leptess::tesseract::TessApi;
 use leptonica_plumbing::{self, leptonica_sys};
@@ -74,10 +74,10 @@ impl Ocr {
         Ok(Ocr { leptess, scale })
     }
     pub fn scan(&mut self, img: &Path) -> Result<String> {
-        let filename = CString::new(img.as_str()).expect("null in filename");
-        let mut cpix = leptonica_plumbing::Pix::read_with_hint(
-            &filename,
-            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA.try_into().unwrap(),
+        let file = File::open(img)?;
+        let mut cpix = leptonica_plumbing::Pix::read_stream(
+            file,
+            leptonica_sys::L_JPEG_CONTINUE_WITH_BAD_DATA,
         )?;
 
         if let Some(scale) = self.scale {

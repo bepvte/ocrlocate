@@ -622,9 +622,7 @@ dependencies = [
 
 [[package]]
 name = "leptonica-plumbing"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc7a74c43d6f090d39158d233f326f47cd8bba545217595c93662b4e31156f42"
+version = "1.4.1"
 dependencies = [
  "leptonica-sys",
  "libc",
