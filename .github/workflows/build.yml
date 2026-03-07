@@ -36,7 +36,8 @@ jobs:
       - name: Start Docker Container
         shell: bash
         run: |
-          docker create \
+          docker start \
+            -d \
             --name rust \
             --platform ${{ matrix.platform }} \
             -v $HOME/.cargo:/usr/local/cargo \
