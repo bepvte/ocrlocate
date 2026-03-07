@@ -59,17 +59,13 @@ jobs:
         # run: sudo apt-get install --no-install-recommends -y libtesseract-dev imagemagick tesseract-ocr-eng fonts-liberation2
         run: |
           ${{ matrix.tag == 'alpine' && 'apk add wget' }}
-          wget -q $GORELEASER_URL
+          wget -q ${{ env.GORELEASER_URL }}
           ${{ matrix.tag == 'alpine' && 'apk add --allow-untrusted leptonica-dev ./goreleaser*.apk'}}
           ${{ matrix.tag == 'latest' && 'sudo dpkg -i goreleaser*.deb && \
           sudo apt-get update && \
           sudo apt-get install -y libleptonica-dev' }}
         env:
-          GORELEASER_URL: >-
-            https://github.com/goreleaser/goreleaser/releases/download/v2.14.1/
-            goreleaser_2.14.1_${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
-            ${{ matrix.tag == 'alpine' && '.apk' || '.deb' }}
-
+          GORELEASER_URL: https://github.com/goreleaser/goreleaser/releases/download/v2.14.1/goreleaser_2.14.1_${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}${{ matrix.tag == 'alpine' && '.apk' || '.deb' }}
       - name: build
         run: cargo build --release --locked --features bundled
 
