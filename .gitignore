@@ -1,3 +1,7 @@
 /target
 /libs/*/target
 test.db*
+# Added by goreleaser init:
+dist/
+.intentionally-empty-file.o
+target/

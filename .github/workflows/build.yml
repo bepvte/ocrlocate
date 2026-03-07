@@ -1,4 +1,4 @@
-name: Windows Build
+name: Build
 
 on:
   push:
@@ -16,9 +16,53 @@ permissions:
   contents: write
 
 jobs:
+  build-linux:
+    strategy:
+      matrix:
+          tag: [alpine, latest]
+          platform: [linux/amd64, linux/arm64]
+    runs-on: ubuntu-latest
+    container:
+      image: "docker.io/library/rust:${{ matrix.tag }}"
+      options: >-
+        --platform=${{ matrix.platform }}
+        -w ${{ github.workspace }}
+      volumes:
+        - /home/runner/.cargo/:/home/runner/.cargo
+        - ${{ github.workspace }}:${{ github.workspace }}
+
+    steps:
+      - name: Docker Setup QEMU
+        uses: docker/setup-qemu-action@v4.0.0
+        with:
+          platforms: arm64
+
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.platform == 'linux/amd64' && 'x86_64-unknown-linux-musl' || 'aarch64-unknown-linux-musl' }}
+          cache-all-crates: true
+          rustflags: ""
+
+      - name: Install dependencies
+        # run: sudo apt-get install --no-install-recommends -y libtesseract-dev imagemagick tesseract-ocr-eng fonts-liberation2
+        run: |
+          wget --secure-protocol=TLSv1_3 -q $GORELEASER_URL
+          ${{ matrix.tag == 'alpine' && 'apk add --no-cache --allow-untrusted leptonica-dev ./goreleaser*.apk'}}
+          ${{ matrix.tag == 'latest' && 'sudo dpkg -i goreleaser*.deb && sudo apt-get install -y libleptonica-dev' }}
+        env:
+          GORELEASER_URL: >-
+            https://github.com/goreleaser/goreleaser/releases/download/v2.14.1/
+            goreleaser_2.14.1_${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+            ${{ matrix.tag == 'alpine' && '.apk' || '.deb' }}
+
+      - name: build
+        run: cargo build --release --locked --features bundled
+
   build-windows:
     runs-on: windows-2025-vs2026
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -56,17 +100,6 @@ jobs:
             ${{env.VCPKG_INSTALLATION_ROOT}}\installed
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
-      # - name: Setup vcpkg
-      #   uses: lukka/run-vcpkg@v11
-      #   with:
-      #     vcpkgDirectory: ${{ github.workspace }}/vcpkg
-      #     vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
-      #     vcpkgJsonGlob: "vcpkg.json"
-      #     runVcpkgInstall: true
-      #     doNotCache: false
-      #   env:
-      #     VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
-      
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
