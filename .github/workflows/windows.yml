@@ -73,7 +73,7 @@ jobs:
           target: x86_64-pc-windows-msvc
           rustflags: ""
           cache-all-crates: true
-          cache: ${{ github.ref_type == 'tag' }}
+          cache: ${{ github.ref_type != 'tag' }}
       
       - name: Build
         run: |
@@ -82,7 +82,7 @@ jobs:
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
-          TESSDATA_PREFIX: ".\tessdata"
+          TESSDATA_PREFIX: '.\tessdata'
         
       - name: Download language data
         run: |
