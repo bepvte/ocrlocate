@@ -95,7 +95,7 @@ jobs:
       - name: Build
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
-          cargo build --release --locked --features bundled -vvv
+          cargo rustc --release --locked --features bundled -vvv -- -C link-arg=/VERBOSE:LIB
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
