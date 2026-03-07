@@ -227,12 +227,6 @@ fn find_tesseract_system_lib() -> Vec<String> {
     );
     #[cfg(windows)]
     println!("cargo:rustc-link-lib=static=tesseract55");
-    if env::var("CI").is_ok() {
-        use std::fs::File;
-        use std::io::prelude::*;
-        let f = File::open(env::var("GITHUB_ENV").unwrap()).unwrap();
-        writeln!(&f, "TESSERACT_LIB_DIR={}", dst.join("lib").to_str().unwrap()).unwrap();
-    }
     #[cfg(not(windows))]
     {
         println!("cargo:rustc-link-lib=static=tesseract");
