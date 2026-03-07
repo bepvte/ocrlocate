@@ -208,12 +208,8 @@ fn find_tesseract_system_lib() -> Vec<String> {
 
     #[cfg(windows)]
     cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix)
-        .profile("Release");
-
-    #[cfg(windows)]
-    {
-        cm.cflag("/utf-8").cxxflag("/utf-8");
-    }
+        .profile("Release")
+        .cflag("/utf-8").cxxflag("/utf-8");
 
     if env::var("CI").is_err()
         && env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|x| x.contains("target-cpu=native"))
@@ -231,6 +227,12 @@ fn find_tesseract_system_lib() -> Vec<String> {
     );
     #[cfg(windows)]
     println!("cargo:rustc-link-lib=static=tesseract55");
+    if env::var("CI").is_ok() {
+        use std::fs::File;
+        use std::io::prelude::*;
+        let f = File::open(env::var("GITHUB_ENV").unwrap()).unwrap();
+        writeln!(&f, "TESSERACT_LIB_DIR={}", dst.join("lib").to_str().unwrap()).unwrap();
+    }
     #[cfg(not(windows))]
     {
         println!("cargo:rustc-link-lib=static=tesseract");

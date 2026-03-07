@@ -100,6 +100,13 @@ jobs:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
           TESSDATA_PREFIX: ".\tessdata"
+        
+      - name: debug build output on failure
+        if: failure()
+        run: |
+          echo "TESSERACT_LIB_DIR: $env:TESSERACT_LIB_DIR"
+          Get-ChildItem -Recurse $env:TESSERACT_LIB_DIR
+          dumpbin /LINKERMEMBER:1 $env:TESSERACT_LIB_DIR\tesseract55.lib | Select-String "TessBaseAPI"
       
       - name: Download language data
         run: |
