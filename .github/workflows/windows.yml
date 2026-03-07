@@ -73,6 +73,7 @@ jobs:
           target: x86_64-pc-windows-msvc
           rustflags: ""
           cache-all-crates: true
+          cache: ${{ github.ref_type == 'tag' }}
       
       - name: Build
         run: |
@@ -97,6 +98,7 @@ jobs:
           mkdir $packageDir
           Copy-Item "target\release\ocrlocate.exe" $packageDir
           Copy-Item "tessdata" "$packageDir\tessdata" -Recurse
+          Copy-Item "scripts\*" $packageDir
           Compress-Archive -Path $packageDir -DestinationPath "ocrlocate-x86_64-pc-windows-msvc.zip"
       
       - name: Upload artifact
@@ -111,3 +113,4 @@ jobs:
         if: github.ref_type == 'tag'
         with:
           files: ocrlocate-x86_64-pc-windows-msvc.zip
+          generate_release_notes: true
