@@ -46,7 +46,8 @@ jobs:
             -v ${{ github.workspace }}:${{ github.workspace }} \
             -w ${{ github.workspace }} \
             "docker.io/library/rust:${{ matrix.tag }}" \
-            ${{ matrix.tag == 'alpine' && 'apk add bash \&\&'}} tail -f /dev/null
+            tail -f /dev/null
+            ${{ matrix.tag == 'alpine' && 'docker exec -i rust apk add bash'}}
 
       - name: Setup Rust
         if: false
