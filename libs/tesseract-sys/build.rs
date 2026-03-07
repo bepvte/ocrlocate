@@ -187,7 +187,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
     cm.define("TESSDATA_PREFIX", find_tessdata_path())
         .define(
             "ENABLE_LTO",
-            if cfg!(all(not(debug_assertions), not(windows))) {
+            if cfg!(all(not(debug_assertions))) {
                 "ON"
             } else {
                 "OFF"
@@ -208,6 +208,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
 
     #[cfg(windows)]
     cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix)
+        .define("WIN32_MT_BUILD", "ON")
         .profile("Release")
         .cflag("/utf-8").cxxflag("/utf-8");
 
@@ -226,7 +227,7 @@ fn find_tesseract_system_lib() -> Vec<String> {
         dst.join("lib").to_str().unwrap()
     );
     #[cfg(windows)]
-    println!("cargo:rustc-link-lib=static:+whole-archive=tesseract55");
+    println!("cargo:rustc-link-lib=static:tesseract55");
     #[cfg(not(windows))]
     {
         println!("cargo:rustc-link-lib=static=tesseract");

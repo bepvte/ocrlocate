@@ -72,7 +72,6 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
           target: x86_64-pc-windows-msvc
       
       - name: Debug env
@@ -82,16 +81,7 @@ jobs:
           echo "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
           ls $env:VCPKG_INSTALLATION_ROOT/packages/
           ls $env:VCPKG_INSTALLATION_ROOT/installed/
-      
-      - name: Probe leptonica
-        run: |
-          cd $RUNNER_TEMP
-          git clone https://github.com/mcgoo/vcpkg-rs.git
-          cd vcpkg-rs
-          cargo install --path ./vcpkg_cli --debug
-          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
-          vcpkg_cli probe -l static leptonica
-      
+
       - name: Build
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
