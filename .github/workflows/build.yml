@@ -21,26 +21,29 @@ jobs:
       matrix:
           tag: [alpine, latest]
           platform: [linux/amd64, linux/arm64]
-          include:
-            - platform: linux/amd64
-              os: ubuntu-24.04
-            - platform: linux/arm64
-              os: ubuntu-24.04-arm
-    runs-on: ${{ matrix.os }}
-    container:
-      image: "docker.io/library/rust:${{ matrix.tag }}"
-      options: >-
-        -w ${{ github.workspace }}
-      volumes:
-        - /home/runner/.cargo/:/home/runner/.cargo
-        - ${{ github.workspace }}:${{ github.workspace }}
-
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -c "docker exec -i rust sh -c < {0}"
     steps:
       - uses: actions/checkout@v6
 
-      - name: Fix shell
-        if: matrix.tag == 'alpine'
-        run: apk add --no-cache bash
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+        
+      - name: Start Docker Container
+        shell: bash
+        run: |
+          docker create \
+            --name rust \
+            --platform ${{ matrix.platform }} \
+            -v $HOME/.cargo:/usr/local/cargo \
+            -v ${{ github.workspace }}:${{ github.workspace }} \
+            -w ${{ github.workspace }} \
+            "docker.io/library/rust:${{ matrix.tag }}" \
+            tail -f /dev/null
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
