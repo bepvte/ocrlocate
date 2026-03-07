@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 use camino::Utf8Path as Path;
+use dirs::data_local_dir;
+use std::env;
 use std::{ffi::CString, fs::File};
 
 use leptess::tesseract::TessApi;
@@ -30,7 +32,23 @@ impl Ocr {
             return Err(anyhow!("Invalid language code: {:?}", lang));
         }
 
-        let mut leptess = TessApi::new(None, &lang.to_ascii_lowercase())?;
+        // on windows we do not expect package managed default prefix
+        let datapath = if cfg!(windows) {
+            let v = env::var("TESSDATA_PREFIX").unwrap_or_else(|_| {
+                data_local_dir()
+                    .expect("users local data directory should exist")
+                    .join("ocrlocate")
+                    .join("tessdata")
+                    .to_str()
+                    .unwrap()
+                    .to_owned()
+            });
+            Some(v)
+        } else {
+            None
+        };
+
+        let mut leptess = TessApi::new(datapath.as_deref(), &lang.to_ascii_lowercase())?;
 
         if !debug {
             leptess

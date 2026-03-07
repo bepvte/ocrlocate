@@ -56,17 +56,6 @@ jobs:
             ${{env.VCPKG_INSTALLATION_ROOT}}\installed
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
-      # - name: Setup vcpkg
-      #   uses: lukka/run-vcpkg@v11
-      #   with:
-      #     vcpkgDirectory: ${{ github.workspace }}/vcpkg
-      #     vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
-      #     vcpkgJsonGlob: "vcpkg.json"
-      #     runVcpkgInstall: true
-      #     doNotCache: false
-      #   env:
-      #     VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
-      
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -82,7 +71,7 @@ jobs:
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
           VCPKGRS_TRIPLET: "x64-windows-static"
-          TESSDATA_PREFIX: '.\tessdata'
+          TESSDATA_PREFIX: 'C:\Program Files\Tesseract-OCR\tessdata'
         
       - name: Download language data
         run: |

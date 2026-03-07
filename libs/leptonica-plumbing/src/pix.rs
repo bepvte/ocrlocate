@@ -1,5 +1,7 @@
 use leptonica_sys::{
-    l_float32, l_int32, l_uint32, pixClone, pixDestroy, pixGetData, pixGetDepth, pixGetHeight, pixGetWidth, pixRead, pixReadMem, pixReadStream, pixReadWithHint, pixScaleGeneral, pixTransferAllData
+    l_float32, l_int32, l_uint32, pixClone, pixDestroy, pixGetData, pixGetDepth, pixGetHeight,
+    pixGetWidth, pixRead, pixReadMem, pixReadStream, pixReadWithHint, pixScaleGeneral,
+    pixTransferAllData,
 };
 
 use crate::memory::{LeptonicaClone, LeptonicaDestroy, RefCountedExclusive};
@@ -34,7 +36,6 @@ impl From<Infallible> for PixReadMemError {
 #[derive(Debug, Error)]
 #[error("Pix::read returned null")]
 pub struct PixReadError();
-
 
 #[derive(Debug, Error, PartialEq)]
 pub enum PixManipError {
@@ -72,10 +73,12 @@ impl AsMut<leptonica_sys::Pix> for Pix {
 fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
     use std::os::unix::io::IntoRawFd;
     let file = file.into_raw_fd();
-    
+
     let fp = unsafe { libc::fdopen(file, b"rb\0".as_ptr() as _) };
     if fp.is_null() {
-        unsafe { libc::fclose(fp); }
+        unsafe {
+            libc::fclose(fp);
+        }
         Err(io::Error::last_os_error())
     } else {
         Ok(fp)
@@ -89,12 +92,17 @@ fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
     let handle = file.into_raw_handle();
     let fd = unsafe { libc::open_osfhandle(handle as isize, libc::O_RDONLY) };
     if fd == -1 {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid file handle"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid file handle",
+        ));
     }
 
     let fp = unsafe { libc::fdopen(fd, b"rb\0".as_ptr() as _) };
     if fp.is_null() {
-        unsafe { libc::close(fd); }
+        unsafe {
+            libc::close(fd);
+        }
         Err(io::Error::last_os_error())
     } else {
         Ok(fp)

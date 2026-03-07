@@ -210,7 +210,8 @@ fn find_tesseract_system_lib() -> Vec<String> {
     cm.define("CMAKE_PREFIX_PATH", &leptonica_prefix)
         .define("WIN32_MT_BUILD", "ON")
         .profile("Release")
-        .cflag("/utf-8").cxxflag("/utf-8");
+        .cflag("/utf-8")
+        .cxxflag("/utf-8");
 
     if env::var("CI").is_err()
         && env::var("CARGO_ENCODED_RUSTFLAGS").is_ok_and(|x| x.contains("target-cpu=native"))
@@ -259,6 +260,7 @@ fn find_tessdata_path() -> String {
         "/usr/share/tesseract-ocr/5.00/tessdata",
         "/usr/share/tesseract-ocr/4/tessdata",
         "/usr/share/tesseract-ocr/5/tessdata",
+        r"C:\Program Files\Tesseract-OCR\tessdata",
     ] {
         let path = Path::new(p);
         if path.exists() {
