@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash -c "docker exec -i rust sh < {0}"
+        shell: bash -c "docker exec -i rust bash < {0}"
     steps:
       - uses: actions/checkout@v6
 
@@ -46,7 +46,7 @@ jobs:
             -v ${{ github.workspace }}:${{ github.workspace }} \
             -w ${{ github.workspace }} \
             "docker.io/library/rust:${{ matrix.tag }}" \
-            tail -f /dev/null
+            ${{ matrix.tag == 'alpine' && 'apk add bash &&'}} tail -f /dev/null
 
       - name: Setup Rust
         if: false
