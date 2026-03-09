@@ -1,0 +1,12 @@
+{
+  "rust-analyzer.cargo.extraEnv": {
+    "VCPKG_ROOT": "C:\\msys64\\home\\bepvt\\ocrlocate\\vcpkg",
+    "VCPKGRS_TRIPLET": "x64-windows-static",
+    "LIBCLANG_PATH": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\Llvm\\x64\\bin\\libclang.dll",
+    "TESSDATA_PREFIX": ".\\tessdata"
+  },
+  "rust-analyzer.cargo.features": "all",
+  "rust-analyzer.server.extraEnv": {
+    "TESSDATA_PREFIX": ".\\tessdata"
+  }
+}

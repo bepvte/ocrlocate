@@ -5,10 +5,11 @@ use leptonica_sys::{
 };
 
 use crate::memory::{LeptonicaClone, LeptonicaDestroy, RefCountedExclusive};
-use std::convert::{AsRef, Infallible, TryInto};
+use std::convert::{AsRef, Infallible, TryFrom, TryInto};
+use std::ffi::{c_int, CStr};
 use std::fs::File;
 use std::io;
-use std::{ffi::CStr, num::TryFromIntError};
+use std::num::TryFromIntError;
 use thiserror::Error;
 
 /// Wrapper around Leptonica's [`Pix`](https://tpgit.github.io/Leptonica/struct_pix.html) structure
@@ -69,43 +70,76 @@ impl AsMut<leptonica_sys::Pix> for Pix {
     }
 }
 
-#[cfg(not(windows))]
-fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
-    use std::os::unix::io::IntoRawFd;
-    let file = file.into_raw_fd();
+struct CFile(*mut libc::FILE);
 
-    let fp = unsafe { libc::fdopen(file, b"rb\0".as_ptr() as _) };
-    if fp.is_null() {
-        unsafe {
-            libc::fclose(fp);
+impl CFile {
+    fn as_ptr(&self) -> *mut libc::FILE {
+        self.0
+    }
+}
+
+impl Drop for CFile {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe {
+                libc::fclose(self.0);
+            }
         }
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(fp)
     }
 }
 
 #[cfg(windows)]
-fn file_to_cfile(file: File) -> Result<*mut libc::FILE, io::Error> {
-    use std::os::windows::io::IntoRawHandle;
+fn last_crt_error(context: &'static str) -> io::Error {
+    unsafe extern "C" {
+        #[link_name = "_get_errno"]
+        fn get_errno(pValue: *mut c_int) -> *mut i32;
+    }
+    let mut errno: c_int = 0;
+    unsafe { get_errno(&mut errno) };
+    let message = unsafe { CStr::from_ptr(libc::strerror(errno)) }
+        .to_string_lossy()
+        .into_owned();
+    io::Error::other(format!("{context}: {message} (errno {errno})"))
+}
 
-    let handle = file.into_raw_handle();
-    let fd = unsafe { libc::open_osfhandle(handle as isize, libc::O_RDONLY) };
-    if fd == -1 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Invalid file handle",
-        ));
+impl TryFrom<File> for CFile {
+    type Error = io::Error;
+
+    #[cfg(not(windows))]
+    fn try_from(file: File) -> Result<Self, Self::Error> {
+        use std::os::unix::io::IntoRawFd;
+        let fd = file.into_raw_fd();
+
+        let fp = unsafe { libc::fdopen(fd, b"rb\0".as_ptr() as _) };
+        if fp.is_null() {
+            unsafe {
+                libc::close(fd);
+            }
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(Self(fp))
+        }
     }
 
-    let fp = unsafe { libc::fdopen(fd, b"rb\0".as_ptr() as _) };
-    if fp.is_null() {
-        unsafe {
-            libc::close(fd);
+    #[cfg(windows)]
+    fn try_from(file: File) -> Result<Self, Self::Error> {
+        use std::os::windows::io::IntoRawHandle;
+
+        let handle = file.into_raw_handle();
+        let fd = unsafe { libc::open_osfhandle(handle as isize, libc::O_RDONLY) };
+        if fd == -1 {
+            return Err(last_crt_error("open_osfhandle failed"));
         }
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(fp)
+
+        let fp = unsafe { libc::fdopen(fd, b"rb\0".as_ptr() as _) };
+        if fp.is_null() {
+            unsafe {
+                libc::close(fd);
+            }
+            Err(last_crt_error("fdopen failed"))
+        } else {
+            Ok(Self(fp))
+        }
     }
 }
 
@@ -167,8 +201,8 @@ impl Pix {
         file: File,
         hint: u32,
     ) -> Result<RefCountedExclusive<Self>, PixReadMemError> {
-        let cfile = file_to_cfile(file)?;
-        let ptr = unsafe { pixReadStream(cfile as _, hint as i32) };
+        let cfile = CFile::try_from(file)?;
+        let ptr = unsafe { pixReadStream(cfile.as_ptr() as _, hint as i32) };
         if ptr.is_null() {
             Err(PixReadMemError::NullPtr)
         } else {

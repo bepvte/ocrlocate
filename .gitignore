@@ -1,3 +1,4 @@
 /target
 /libs/*/target
 test.db*
+vcpkg/
