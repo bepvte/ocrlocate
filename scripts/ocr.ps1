@@ -21,6 +21,19 @@ if (-not $c) {
 $tempFile = New-TemporaryFile
 $title = $Query -join ' '
 
+$ocrlocateCommand = Get-Command 'ocrlocate.exe' -CommandType Application -ErrorAction SilentlyContinue
+if (-not $ocrlocateCommand) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $localOcrlocate = Join-Path (Split-Path -Parent $scriptDir) 'ocrlocate.exe'
+    if (Test-Path $localOcrlocate) {
+        $ocrlocateCommand = $localOcrlocate
+    }
+}
+
+if (-not $ocrlocateCommand) {
+    throw 'Could not find ocrlocate.exe in PATH or one level above this script.'
+}
+
 # Build ocrlocate arguments properly
 $ocrlocateArgs = @()
 if (-not $i) {
@@ -29,7 +42,7 @@ if (-not $i) {
 $ocrlocateArgs += $Query
 
 # Run ocrlocate and extract file paths (2nd column - cut -f2 equivalent)
-ocrlocate @ocrlocateArgs | ForEach-Object {
+& $ocrlocateCommand @ocrlocateArgs | ForEach-Object {
     $fields = $_ -split "`t", 2
     if ($fields.Count -ge 2) {
         $fields[1]
